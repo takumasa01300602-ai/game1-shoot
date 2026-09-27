@@ -1103,7 +1103,7 @@ function buildGLBChar(kind,key){
   if(deathAct){ deathAct.setLoop(THREE.LoopOnce,1); deathAct.clampWhenFinished=true; }
   let rifle=null, handR=null;
   if(isSoldier&&rifleProto){
-    rifle=rifleProto.clone(); root.add(rifle);
+    rifle=THREE.SkeletonUtils.clone(rifleProto); root.add(rifle); // ← 修正
     handR=findBone(inner,/(hand|fist|wrist).*(\.r$|_r$|right)|right.*hand/i);
     rifle.position.set(0.12,1.25,-0.35);
   }
