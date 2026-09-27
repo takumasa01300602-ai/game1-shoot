@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>DEAD BRIDGE: TACTICAL DEFENSE</title>
+  <title>DEAD BRIDGE: HORDE INVASION EX</title>
   <style>
     * {
       box-sizing: border-box;
@@ -79,6 +79,31 @@
     #squad-val { font-size: 20px; color: #38bdf8; text-shadow: 0 0 8px rgba(56, 189, 248, 0.5); }
     #score-val { font-size: 20px; color: #facc15; text-shadow: 0 0 8px rgba(250, 204, 21, 0.5); }
 
+    /* ホード警告インジケーター */
+    #horde-warning {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 14px) + 52px);
+      left: 50%;
+      transform: translateX(-50%) scale(0.8);
+      padding: 6px 20px;
+      background: rgba(185, 28, 28, 0.92);
+      border: 2px solid #ef4444;
+      border-radius: 20px;
+      color: #fff;
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing: 2px;
+      box-shadow: 0 0 25px rgba(239, 68, 68, 0.85);
+      display: none;
+      z-index: 15;
+      animation: alertPulse 0.4s infinite alternate;
+      pointer-events: none;
+    }
+    @keyframes alertPulse {
+      from { transform: translateX(-50%) scale(0.95); opacity: 0.8; }
+      to { transform: translateX(-50%) scale(1.08); opacity: 1; }
+    }
+
     /* ボスHUD */
     #boss-hud {
       position: absolute;
@@ -101,10 +126,6 @@
       margin-bottom: 4px;
       text-shadow: 0 2px 4px rgba(0,0,0,0.9);
       animation: alertPulse 0.8s infinite alternate;
-    }
-    @keyframes alertPulse {
-      from { opacity: 0.8; }
-      to { opacity: 1; }
     }
     .bar-wrap {
       width: 100%;
@@ -257,6 +278,7 @@
 <body>
   <div id="game-container">
     <div id="vignette"></div>
+    <div id="horde-warning">⚠ MASSIVE HORDE DETECTED ⚠</div>
     <div id="error-box"></div>
     <div id="damage-layer"></div>
 
@@ -288,13 +310,12 @@
 
     <!-- スタート画面 -->
     <div id="start-screen" class="screen-overlay">
-      <h1 class="screen-title">DEAD BRIDGE: TACTICAL</h1>
+      <h1 class="screen-title">DEAD BRIDGE: OVERKILL</h1>
       <p id="start-subtext" class="screen-desc">
-        <b>【左右のエイム判断に全集中せよ】</b><br>
-        射撃は自動フルオート！<br>
-        疾走する<b>超高速ランナー</b>を正面で迎え撃ち、<br>
-        青壁越しに射撃して<b>強化貫通弾</b>で奥の群れを薙ぎ払え！<br>
-        防衛ラインにゾンビが1体でも到達すると味方が戦死する！
+        <b>【後半地獄化・猛攻サバイバル】</b><br>
+        時間が経つにつれ、<b>ゾンビの群れが画面を埋め尽くす</b>！<br>
+        青壁越しに射撃して<b>強化貫通弾</b>で大群を薙ぎ払い、<br>
+        空爆ゲージを溜めて危機を突破せよ！
       </p>
 
       <div id="loading-box">
@@ -334,7 +355,6 @@
       } catch (e) {}
     }
 
-    // 【修正】kGain.gain.linearRampToValueAtTime に修正し、全体をtry-catchで安全保護
     function stepBgm() {
       if (!audioCtx || !isPlaying) return;
       try {
@@ -361,14 +381,14 @@
         gain.connect(audioCtx.destination);
         noise.start(now);
 
-        // バスドラム（修正箇所：kGain.gain）
+        // バスドラム
         if (bgmStep % 4 === 0) {
           const kOsc = audioCtx.createOscillator();
           const kGain = audioCtx.createGain();
           kOsc.frequency.setValueAtTime(120, now);
           kOsc.frequency.exponentialRampToValueAtTime(30, now + 0.1);
           kGain.gain.setValueAtTime(0.14, now);
-          kGain.gain.linearRampToValueAtTime(0.001, now + 0.1); // ← 正確に修正！
+          kGain.gain.linearRampToValueAtTime(0.001, now + 0.1);
           kOsc.connect(kGain);
           kGain.connect(audioCtx.destination);
           kOsc.start(now);
@@ -458,6 +478,7 @@
     let score = 0;
     let gameTime = 0;
     let spawnTimer = 0;
+    let hordeTimer = 11.0;
     let gateTimer = 0;
     let shakeIntensity = 0;
 
@@ -586,7 +607,7 @@
       return new THREE.CanvasTexture(cvs);
     }
 
-    // --- 特殊部隊装備（ライフル ＆ 4眼暗視ゴーグル） ---
+    // --- 特殊部隊装備 ---
     function createSpecialForcesRifle() {
       const gun = new THREE.Group();
       const gunMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.3, metalness: 0.85 });
@@ -686,12 +707,12 @@
       model.scale.set(scale, scale, scale);
 
       const mixer = new THREE.AnimationMixer(model);
-      let clip = soldierAnimations[3] || soldierAnimations[0];
+      let clip = soldierAnimations[3] || soldierAnimations[0]; // Walk
       let animSpeed = 1.0;
 
       if (type === 'runner') {
         clip = soldierAnimations[1]; // Run
-        animSpeed = 1.9;
+        animSpeed = 1.95;
       }
       const action = mixer.clipAction(clip);
       action.timeScale = animSpeed;
@@ -881,7 +902,7 @@
       );
     }
 
-    // --- 入力制御（左右ドラッグ操作のみに一本化） ---
+    // --- 入力制御（左右ドラッグ操作） ---
     function setupTouchControls() {
       let startX = 0;
       let initX = 0;
@@ -919,7 +940,7 @@
       renderer.setSize(c.clientWidth, c.clientHeight);
     }
 
-    // --- 部隊編成（密集デルタ隊形で射線を集中！） ---
+    // --- 部隊編成（密集デルタ隊形） ---
     function updateSquadLayout() {
       document.getElementById('squad-val').innerText = squadMembers.length;
       squadMembers.forEach((m, idx) => {
@@ -1122,6 +1143,7 @@
       score = 0;
       gameTime = 0;
       spawnTimer = 0;
+      hordeTimer = 10.0;
       gateTimer = 1.0;
       shakeIntensity = 0;
       ultGauge = 0;
@@ -1145,6 +1167,7 @@
       updateUltUi();
       document.getElementById('score-val').innerText = '0';
       document.getElementById('boss-hud').style.display = 'none';
+      document.getElementById('horde-warning').style.display = 'none';
 
       isPlaying = true;
     }
@@ -1274,7 +1297,7 @@
           }
         });
 
-        // 完全自動フルオート射撃
+        // 自動フルオート射撃
         shootCool -= delta;
         if (shootCool <= 0) {
           shootCool = 0.12;
@@ -1328,63 +1351,87 @@
           gateTimer = 8.0;
         }
 
-        // ゾンビ大群スポーン（左右判断を迫る戦術ウェーブ設計）
-        spawnTimer -= delta;
-        if (spawnTimer <= 0 && !boss) {
-          const pattern = Math.random();
+        // --- 【超強化】後半のホード（大津波ウェーブ） ---
+        hordeTimer -= delta;
+        const hordeInterval = gameTime > 30 ? 7.5 : 11.0; // 後半はホード頻度UP！
+        if (hordeTimer <= 0) {
+          hordeTimer = hordeInterval;
+          document.getElementById('horde-warning').style.display = 'block';
+          setTimeout(() => { document.getElementById('horde-warning').style.display = 'none'; }, 2200);
+          playSfx('explosion');
 
-          if (pattern < 0.45) {
-            // 【高速ランナー強襲ウェーブ】特定のレーンにランナー3体が縦一列で猛ダッシュ！
-            const laneSide = Math.random() < 0.5 ? -1 : 1;
-            const laneX = laneSide * 2.8;
+          // 後半は18体以上の超巨大津波！
+          const hordeSize = gameTime > 25 ? 18 : 12;
+          for (let h = 0; h < hordeSize; h++) {
+            const laneX = -BRIDGE_WIDTH / 2 + 0.8 + (Math.random() * (BRIDGE_WIDTH - 1.6));
+            const zOff = -50 - (Math.random() * 12);
+            const isRunner = Math.random() < (gameTime > 30 ? 0.55 : 0.35);
+            const type = isRunner ? 'runner' : (Math.random() < 0.25 ? 'tank' : 'normal');
 
-            for (let r = 0; r < 3; r++) {
-              const zObj = spawnZombieInstance('runner');
-              zObj.model.position.set(laneX + (Math.random() - 0.5) * 0.6, 0, -42 - r * 4);
-              scene.add(zObj.model);
-              zombies.push({
-                mesh: zObj.model,
-                mixer: zObj.mixer,
-                bones: zObj.bones,
-                mats: zObj.mats,
-                hp: 2,
-                type: 'runner',
-                speed: 0.28,
-                wobbleSeed: Math.random() * 10
-              });
-            }
-          } else {
-            // 【通常＋タンク肉壁ウェーブ】
-            const count = Math.floor(Math.random() * 3) + 4;
-            const tankLane = Math.floor(Math.random() * count);
+            const zObj = spawnZombieInstance(type);
+            zObj.model.position.set(laneX, 0, zOff);
+            scene.add(zObj.model);
 
-            for (let k = 0; k < count; k++) {
-              const isTank = (k === tankLane && Math.random() < 0.5);
-              const type = isTank ? 'tank' : 'normal';
-              const x = (Math.random() - 0.5) * (BRIDGE_WIDTH - 1.5);
-              const zOffset = -42 - Math.random() * 8;
+            let hp = type === 'tank' ? 14 : (type === 'runner' ? 2 : 3);
+            let spd = type === 'runner' ? 0.30 : (type === 'tank' ? 0.08 : 0.13);
 
-              const zObj = spawnZombieInstance(type);
-              zObj.model.position.set(x, 0, zOffset);
-              scene.add(zObj.model);
-
-              zombies.push({
-                mesh: zObj.model,
-                mixer: zObj.mixer,
-                bones: zObj.bones,
-                mats: zObj.mats,
-                hp: isTank ? 12 : 3,
-                type,
-                speed: isTank ? 0.08 : 0.12,
-                wobbleSeed: Math.random() * 10
-              });
-            }
+            zombies.push({
+              mesh: zObj.model,
+              mixer: zObj.mixer,
+              bones: zObj.bones,
+              mats: zObj.mats,
+              hp,
+              type,
+              speed: spd,
+              wobbleSeed: Math.random() * 10
+            });
           }
-
-          spawnTimer = Math.max(0.4, 1.05 - gameTime * 0.015);
         }
 
-        // ボス強襲
+        // --- 【超強化】後半の敵の数＆スポーン頻度のスケーリング ---
+        spawnTimer -= delta;
+        if (spawnTimer <= 0) {
+          // 後半（20秒以降）は一度に 7〜14体が雪崩のように出現！
+          const baseCount = gameTime > 30 ? 8 : (gameTime > 18 ? 6 : 4);
+          const count = baseCount + Math.floor(Math.random() * 5);
+
+          const isLate = gameTime > 25;
+          const runnerChance = isLate ? 0.5 : 0.35; // 後半は半分が猛突進ランナー！
+
+          for (let k = 0; k < count; k++) {
+            const rand = Math.random();
+            let type = 'normal';
+            if (rand < runnerChance) type = 'runner';
+            else if (rand < runnerChance + 0.25) type = 'tank'; // 肉壁タンク
+
+            const x = (Math.random() - 0.5) * (BRIDGE_WIDTH - 1.5);
+            const zOffset = -42 - Math.random() * 10;
+
+            const zObj = spawnZombieInstance(type);
+            zObj.model.position.set(x, 0, zOffset);
+            scene.add(zObj.model);
+
+            let hp = type === 'tank' ? (isLate ? 16 : 12) : (type === 'runner' ? 2 : 3);
+            let spd = type === 'runner' ? (isLate ? 0.30 : 0.28) : (type === 'tank' ? 0.08 : 0.13);
+
+            zombies.push({
+              mesh: zObj.model,
+              mixer: zObj.mixer,
+              bones: zObj.bones,
+              mats: zObj.mats,
+              hp,
+              type,
+              speed: spd,
+              wobbleSeed: Math.random() * 10
+            });
+          }
+
+          // 後半は最短0.25秒間隔でドバドバ出現！
+          const minInterval = gameTime > 30 ? 0.25 : 0.45;
+          spawnTimer = Math.max(minInterval, 1.0 - gameTime * 0.02);
+        }
+
+        // ボス出現（38秒経過または撃破数到達）
         if (!boss && (gameTime > 38 || score >= 90)) {
           const bObj = spawnGoliathBossInstance();
           bObj.model.position.set(0, 0, -55);
@@ -1395,9 +1442,9 @@
             mixer: bObj.mixer,
             bones: bObj.bones,
             mats: bObj.mats,
-            hp: 500,
-            maxHp: 500,
-            speed: 0.032
+            hp: 650, // ボスHPも大幅増強！
+            maxHp: 650,
+            speed: 0.034
           };
           document.getElementById('boss-hud').style.display = 'flex';
           shakeIntensity = 1.0;
@@ -1419,7 +1466,7 @@
             continue;
           }
 
-          // 壁の貫通判定（青壁を通った弾は威力2倍＆貫通付与）
+          // 壁の貫通判定
           for (let g of gates) {
             const gz = g.mesh.position.z;
             if (oldZ >= gz - 0.5 && newZ <= gz + 0.5) {
@@ -1433,8 +1480,8 @@
                       g.val++;
                       updateGateTexture(g);
                     }
-                    b.damage = 2; // 青壁で威力倍増
-                    b.penetration = 3; // 3体貫通
+                    b.damage = 2; // 青壁で威力倍増！
+                    b.penetration = 3; // 3体貫通！
                     b.mesh.material.map = tracerTextureAmp;
                   }
                 }
@@ -1461,7 +1508,7 @@
               z.hp -= dmg;
               b.penetration--;
 
-              chargeUlt(0.9);
+              chargeUlt(0.65);
               playSfx('splat');
               showDamageNumber(dmg, zx, 1.2, zz, isCrit || b.damage > 1);
               spawnMeatDebris(zx, 0.7, zz, 0x5a7d65, 3);
@@ -1493,7 +1540,7 @@
             if ((oldZ >= bz - 2.2) && (newZ <= bz + 2.2) && Math.abs(b.mesh.position.x - bx) <= 2.2) {
               boss.hp -= b.damage;
               b.penetration--;
-              chargeUlt(0.6);
+              chargeUlt(0.5);
               playSfx('splat');
               showDamageNumber(b.damage, bx, 2.5, bz);
               updateBossHp();
@@ -1520,7 +1567,7 @@
           }
         }
 
-        // --- 2. ゾンビの移動＆防衛ライン判定 ---
+        // --- 2. ゾンビの移動＆即死防衛ライン ---
         for (let i = zombies.length - 1; i >= 0; i--) {
           const z = zombies[i];
           z.mesh.position.z += z.speed;
@@ -1610,11 +1657,11 @@
       if (isClear) {
         title.innerText = 'MISSION ACCOMPLISHED';
         title.style.color = '#22c55e';
-        desc.innerHTML = `変異巨獣ゴライアスを完全殲滅！<br>極限状況を生き延びた！<br><br>撃破数: <b>${score}体</b><br>残存戦力: <b>${squadMembers.length}名</b>`;
+        desc.innerHTML = `変異巨獣ゴライアスと大群を完全殲滅！<br>極限状況を生き延びた！<br><br>撃破数: <b>${score}体</b><br>残存戦力: <b>${squadMembers.length}名</b>`;
       } else {
         title.innerText = 'DEFENSE OVERRUN';
         title.style.color = '#ef4444';
-        desc.innerHTML = `防衛線が突破され部隊が全滅した...<br><br>撃破数: <b>${score}体</b>`;
+        desc.innerHTML = `ゾンビの大津波に防衛線を突破された...<br><br>撃破数: <b>${score}体</b>`;
       }
       res.style.display = 'flex';
     }
