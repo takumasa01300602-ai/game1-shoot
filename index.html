@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>CYBER SQUAD: OVERDRIVE</title>
+  <title>OPERATION: BRIDGE DEFENSE</title>
   <style>
     * {
       box-sizing: border-box;
@@ -18,8 +18,8 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background-color: #010409;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #7dd3fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
       touch-action: none;
     }
     #game-container {
@@ -34,7 +34,7 @@
       height: 100%;
     }
 
-    /* サイバーHUD */
+    /* ミリタリーHUD */
     .hud-top {
       position: absolute;
       top: env(safe-area-inset-top, 14px);
@@ -47,24 +47,24 @@
       z-index: 10;
     }
     .hud-chip {
-      background: rgba(13, 21, 38, 0.75);
-      border: 1px solid rgba(56, 189, 248, 0.4);
-      backdrop-filter: blur(12px);
+      background: rgba(15, 23, 42, 0.8);
+      border: 1.5px solid rgba(255, 255, 255, 0.4);
+      backdrop-filter: blur(8px);
       padding: 6px 14px;
-      border-radius: 20px;
+      border-radius: 12px;
       color: #fff;
       font-size: 13px;
       font-weight: 900;
       letter-spacing: 0.5px;
-      box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       display: flex;
       align-items: center;
       gap: 6px;
     }
-    #squad-text { font-size: 18px; color: #38bdf8; text-shadow: 0 0 10px #38bdf8; }
-    #score-text { font-size: 18px; color: #facc15; text-shadow: 0 0 10px #facc15; }
+    #squad-text { font-size: 18px; color: #38bdf8; }
+    #score-text { font-size: 18px; color: #facc15; }
 
-    /* ボスHUD */
+    /* ボスHPバー */
     #boss-hud {
       position: absolute;
       top: calc(env(safe-area-inset-top, 14px) + 52px);
@@ -79,36 +79,30 @@
       pointer-events: none;
     }
     #boss-name {
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 900;
-      color: #ff0055;
+      color: #dc2626;
       letter-spacing: 2px;
       margin-bottom: 4px;
-      text-shadow: 0 0 12px #ff0055;
-      animation: alertBlink 0.6s infinite alternate;
-    }
-    @keyframes alertBlink {
-      from { opacity: 0.8; transform: scale(1); }
-      to { opacity: 1; transform: scale(1.04); }
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
     }
     .boss-hp-frame {
       width: 100%;
       height: 12px;
-      background: rgba(0, 0, 0, 0.85);
-      border: 1.5px solid #ff0055;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #dc2626;
       border-radius: 6px;
       overflow: hidden;
-      box-shadow: 0 0 15px rgba(255, 0, 85, 0.4);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
     }
     #boss-hp-fill {
       width: 100%;
       height: 100%;
-      background: linear-gradient(90deg, #ff0055, #f43f5e);
-      box-shadow: 0 0 10px #ff0055;
+      background: linear-gradient(90deg, #f87171, #dc2626);
       transition: width 0.08s linear;
     }
 
-    /* アルティメットボタン */
+    /* 空爆要請ボタン */
     #ult-btn {
       position: absolute;
       bottom: calc(env(safe-area-inset-bottom, 16px) + 20px);
@@ -116,9 +110,9 @@
       width: 76px;
       height: 76px;
       border-radius: 50%;
-      background: radial-gradient(circle, #0f172a, #020617);
-      border: 2px solid #64748b;
-      color: #64748b;
+      background: radial-gradient(circle, #334155, #0f172a);
+      border: 2.5px solid #64748b;
+      color: #94a3b8;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -127,25 +121,25 @@
       font-size: 10px;
       letter-spacing: 0.5px;
       z-index: 20;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.5);
       transition: all 0.2s;
       outline: none;
     }
     #ult-btn.ready {
-      border-color: #facc15;
+      border-color: #ef4444;
       color: #fff;
-      background: radial-gradient(circle, #854d0e, #ca8a04);
-      box-shadow: 0 0 25px rgba(250, 204, 21, 0.8);
-      animation: pulseBtn 1s infinite alternate;
+      background: radial-gradient(circle, #b91c1c, #7f1d1d);
+      box-shadow: 0 0 25px rgba(239, 68, 68, 0.8);
+      animation: pulseAlert 0.8s infinite alternate;
       cursor: pointer;
     }
-    @keyframes pulseBtn {
+    @keyframes pulseAlert {
       from { transform: scale(1); }
       to { transform: scale(1.08); }
     }
     #ult-btn:active.ready { transform: scale(0.92); }
 
-    /* ダメージ数値レイヤー */
+    /* ダメージ表示レイヤー */
     #damage-layer {
       position: absolute;
       inset: 0;
@@ -157,23 +151,23 @@
       position: absolute;
       font-size: 15px;
       font-weight: 900;
-      color: #f8fafc;
-      text-shadow: 0 0 8px #000, 0 0 12px #38bdf8;
+      color: #ffffff;
+      text-shadow: 0 1px 4px #000, 0 0 8px rgba(0,0,0,0.8);
       pointer-events: none;
       transition: transform 0.6s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 0.6s;
     }
     .dmg-num.crit {
       font-size: 22px;
       color: #facc15;
-      text-shadow: 0 0 10px #facc15, 0 0 20px #eab308;
+      text-shadow: 0 2px 6px #000;
     }
 
-    /* モーダル画面（スタート/リザルト） */
+    /* 画面オーバーレイ */
     .screen-overlay {
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.92) 0%, rgba(1, 4, 9, 0.98) 100%);
-      backdrop-filter: blur(16px);
+      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.85) 0%, rgba(2, 6, 23, 0.94) 100%);
+      backdrop-filter: blur(10px);
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -183,39 +177,41 @@
       text-align: center;
     }
     .screen-title {
-      font-size: 36px;
+      font-size: 34px;
       font-weight: 900;
       letter-spacing: 2px;
       margin-bottom: 12px;
-      text-shadow: 0 0 30px rgba(56, 189, 248, 0.8);
+      color: #ffffff;
+      text-shadow: 0 4px 15px rgba(0,0,0,0.8);
     }
     .screen-desc {
       font-size: 13px;
-      color: #94a3b8;
-      max-width: 310px;
+      color: #cbd5e1;
+      max-width: 320px;
       line-height: 1.7;
       margin-bottom: 28px;
     }
-    .btn-cyber {
+    .btn-main {
       padding: 16px 44px;
       font-size: 17px;
       font-weight: 900;
       border: none;
       border-radius: 40px;
-      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      background: linear-gradient(135deg, #15803d, #22c55e);
       color: #fff;
-      box-shadow: 0 0 25px rgba(56, 189, 248, 0.6);
+      box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
       cursor: pointer;
       outline: none;
+      letter-spacing: 1px;
     }
-    .btn-cyber:active { transform: scale(0.95); }
+    .btn-main:active { transform: scale(0.95); }
 
-    /* ローグライク報酬選択カード */
+    /* アップグレード選択 */
     #upgrade-screen {
       position: absolute;
       inset: 0;
-      background: rgba(1, 4, 9, 0.92);
-      backdrop-filter: blur(14px);
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
       display: none;
       flex-direction: column;
       justify-content: center;
@@ -231,18 +227,18 @@
       max-width: 320px;
     }
     .up-card {
-      background: rgba(15, 23, 42, 0.85);
-      border: 1.5px solid #38bdf8;
-      border-radius: 16px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 2px solid #64748b;
+      border-radius: 14px;
       padding: 14px 18px;
       text-align: left;
       cursor: pointer;
-      box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
       transition: transform 0.15s, border-color 0.15s;
     }
-    .up-card:active { transform: scale(0.96); border-color: #facc15; }
-    .up-title { font-size: 16px; font-weight: 900; color: #38bdf8; margin-bottom: 4px; }
-    .up-desc { font-size: 12px; color: #94a3b8; line-height: 1.4; }
+    .up-card:active { transform: scale(0.96); border-color: #22c55e; }
+    .up-title { font-size: 16px; font-weight: 900; color: #facc15; margin-bottom: 4px; }
+    .up-desc { font-size: 12px; color: #cbd5e1; line-height: 1.4; }
 
     #error-log {
       position: absolute;
@@ -252,14 +248,7 @@
     }
   </style>
 
-  <!-- Three.js + Postprocessing Bloom + GSAP CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 </head>
 <body>
@@ -280,42 +269,42 @@
 
     <!-- ボスHUD -->
     <div id="boss-hud">
-      <div id="boss-name">⚠ A.E.G.I.S. TITAN OVERLORD ⚠</div>
+      <div id="boss-name">⚠ TARGET: HEAVY TANK MAMMOTH ⚠</div>
       <div class="boss-hp-frame">
         <div id="boss-hp-fill"></div>
       </div>
     </div>
 
-    <!-- アルティメットボタン -->
+    <!-- 空爆ボタン -->
     <button id="ult-btn">
-      <span>ULTIMATE</span>
+      <span>AIRSTRIKE</span>
       <span id="ult-pct">0%</span>
     </button>
 
-    <!-- ローグライクアップグレード画面 -->
+    <!-- アップグレード画面 -->
     <div id="upgrade-screen">
-      <h2 style="color: #facc15; font-size: 20px; font-weight: 900; margin-bottom: 6px; letter-spacing: 1px;">TACTICAL UPGRADE</h2>
-      <p style="color: #94a3b8; font-size: 12px; margin-bottom: 18px;">戦術強化モジュールを選択してください</p>
+      <h2 style="color: #facc15; font-size: 20px; font-weight: 900; margin-bottom: 6px; letter-spacing: 1px;">TACTICAL SUPPLY</h2>
+      <p style="color: #cbd5e1; font-size: 12px; margin-bottom: 18px;">補給物資を選択してください</p>
       <div id="upgrade-cards"></div>
     </div>
 
     <!-- スタート画面 -->
     <div id="start-screen" class="screen-overlay">
-      <h1 class="screen-title" style="color: #38bdf8;">CYBER SQUAD</h1>
+      <h1 class="screen-title">OPERATION: COASTAL DEFENSE</h1>
       <p class="screen-desc">
-        <b>【Unreal Bloom 次世代仕様】</b><br>
-        ゲートを撃ち抜いて味方を増やし、敵弾を回避せよ！<br>
-        EXゲージ満タンで<b>軌道レーザー爆撃</b>が発動可能。<br>
-        巨大タイタンボスの両肩キャノンを破壊せよ！
+        <b>【リアル・ミリタリー防衛戦】</b><br>
+        晴天のベイブリッジで押し寄せる敵軍を迎え撃て！<br>
+        作戦ゲートを撃ち抜いて味方小隊を増員せよ。<br>
+        航空支援ゲージ満タンで<b>絨毯空爆</b>を要請可能！
       </p>
-      <button id="start-btn" class="btn-cyber">DEPLOY SQUAD</button>
+      <button id="start-btn" class="btn-main">COMMENCE MISSION</button>
     </div>
 
     <!-- リザルト画面 -->
     <div id="result-screen" class="screen-overlay" style="display: none;">
       <h1 id="result-title" class="screen-title">MISSION COMPLETE</h1>
       <p id="result-desc" class="screen-desc"></p>
-      <button id="retry-btn" class="btn-cyber">REDEPLOY</button>
+      <button id="retry-btn" class="btn-main">REDEPLOY</button>
     </div>
   </div>
 
@@ -326,47 +315,55 @@
       el.innerText = `Line ${line}: ${msg}`;
     };
 
-    // --- Web Audio 高音質シンセ（BGM & SFX） ---
+    // --- Web Audio リアルミリタリー音響 ---
     let audioCtx = null;
     let bgmStep = 0;
     let bgmTimer = 0;
-    const BASS_NOTES = [55, 55, 65.4, 55, 73.4, 55, 82.4, 49];
 
     function initAudio() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') audioCtx.resume();
     }
 
+    // 軍隊ドラム＆マーチビートBGM
     function stepBgm() {
       if (!audioCtx || !isPlaying) return;
       const now = audioCtx.currentTime;
 
-      // アシッドベース
-      const osc = audioCtx.createOscillator();
+      // スネア・スネアロール風ノイズ
+      const bufferSize = audioCtx.sampleRate * 0.05;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(1200, now);
+
       const gain = audioCtx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(BASS_NOTES[bgmStep % 8], now);
+      const isStrong = (bgmStep % 4 === 0) || (bgmStep % 4 === 2);
+      gain.gain.setValueAtTime(isStrong ? 0.08 : 0.03, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
 
-      gain.gain.setValueAtTime(0.06, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-
-      osc.connect(gain);
+      noise.connect(filter);
+      filter.connect(gain);
       gain.connect(audioCtx.destination);
-      osc.start(now);
-      osc.stop(now + 0.12);
+      noise.start(now);
 
-      // キック
+      // バスドラム
       if (bgmStep % 4 === 0) {
         const kOsc = audioCtx.createOscillator();
         const kGain = audioCtx.createGain();
-        kOsc.frequency.setValueAtTime(160, now);
-        kOsc.frequency.exponentialRampToValueAtTime(30, now + 0.09);
-        kGain.gain.setValueAtTime(0.12, now);
-        kGain.gain.linearRampToValueAtTime(0.001, now + 0.09);
+        kOsc.frequency.setValueAtTime(120, now);
+        kOsc.frequency.exponentialRampToValueAtTime(30, now + 0.1);
+        kGain.gain.setValueAtTime(0.14, now);
+        kGain.gain.linearRampToValueAtTime(0.001, now + 0.1);
         kOsc.connect(kGain);
         kGain.connect(audioCtx.destination);
         kOsc.start(now);
-        kOsc.stop(now + 0.09);
+        kOsc.stop(now + 0.1);
       }
       bgmStep++;
     }
@@ -375,48 +372,85 @@
       if (!audioCtx) return;
       try {
         const now = audioCtx.currentTime;
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
 
-        if (type === 'laser') {
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(700, now);
-          osc.frequency.exponentialRampToValueAtTime(140, now + 0.05);
-          gain.gain.setValueAtTime(0.03, now);
+        // 1. 実銃アサルトライフル発砲音（乾いた金属ノイズ＋衝撃波）
+        if (type === 'rifle') {
+          const bufferSize = audioCtx.sampleRate * 0.08;
+          const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+          const noise = audioCtx.createBufferSource();
+          noise.buffer = buffer;
+          const gain = audioCtx.createGain();
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+          const osc = audioCtx.createOscillator();
+          const oGain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(180, now);
+          osc.frequency.exponentialRampToValueAtTime(40, now + 0.06);
+          oGain.gain.setValueAtTime(0.15, now);
+          oGain.gain.linearRampToValueAtTime(0.001, now + 0.06);
+
+          noise.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.connect(oGain);
+          oGain.connect(audioCtx.destination);
+
+          noise.start(now);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        }
+        // 2. 弾着（土煙・肉・金属ヒット）
+        else if (type === 'impact') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(140, now);
+          osc.frequency.linearRampToValueAtTime(40, now + 0.05);
+          gain.gain.setValueAtTime(0.06, now);
           gain.gain.linearRampToValueAtTime(0.001, now + 0.05);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
           osc.start(now);
           osc.stop(now + 0.05);
-        } else if (type === 'hit') {
-          osc.type = 'square';
-          osc.frequency.setValueAtTime(260, now);
-          osc.frequency.linearRampToValueAtTime(80, now + 0.04);
-          gain.gain.setValueAtTime(0.05, now);
-          gain.gain.linearRampToValueAtTime(0.001, now + 0.04);
-          osc.start(now);
-          osc.stop(now + 0.04);
-        } else if (type === 'explode') {
+        }
+        // 3. 爆発（手榴弾・戦車主砲砲撃）
+        else if (type === 'explosion') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
           osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(140, now);
-          osc.frequency.exponentialRampToValueAtTime(20, now + 0.35);
-          gain.gain.setValueAtTime(0.25, now);
-          gain.gain.linearRampToValueAtTime(0.001, now + 0.35);
+          osc.frequency.setValueAtTime(110, now);
+          osc.frequency.exponentialRampToValueAtTime(20, now + 0.45);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.linearRampToValueAtTime(0.001, now + 0.45);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
           osc.start(now);
-          osc.stop(now + 0.35);
-        } else if (type === 'orbital') {
+          osc.stop(now + 0.45);
+        }
+        // 4. ジェット戦闘機通過＆空爆音
+        else if (type === 'airstrike') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
           osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(60, now);
-          gain.gain.setValueAtTime(0.4, now);
+          osc.frequency.setValueAtTime(250, now);
+          osc.frequency.linearRampToValueAtTime(600, now + 0.3);
+          osc.frequency.linearRampToValueAtTime(80, now + 1.2);
+          gain.gain.setValueAtTime(0.35, now);
           gain.gain.linearRampToValueAtTime(0.001, now + 1.2);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
           osc.start(now);
           osc.stop(now + 1.2);
         }
       } catch (e) {}
     }
 
-    // --- ゲーム設定 & 状態 ---
-    const BRIDGE_WIDTH = 9.4;
+    // --- ゲーム設定 ---
+    const BRIDGE_WIDTH = 9.6;
     const DEFENSE_Z = 13.0;
     let isPlaying = false;
     let score = 0;
@@ -426,21 +460,21 @@
     let waveCount = 1;
     let shakeIntensity = 0;
 
-    // アルティメットゲージ
+    // 空爆ゲージ
     let ultGauge = 0;
     let isUltReady = false;
 
-    // プレイヤー性能（ローグライク強化）
-    let fireRateMultiplier = 1.0;
-    let hasBounceBullets = false;
-    let hasSupportDrone = false;
-    let droneMesh = null;
+    // ローグライク補給
+    let fireRateMult = 1.0;
+    let hasArmorPiercing = false;
+    let hasGunshipSupport = false;
+    let gunshipMesh = null;
 
-    // Three.js & Postprocessing
-    let scene, camera, renderer, composer;
+    // Three.js
+    let scene, camera, renderer;
     let playerLeaderX = 0;
     let targetX = 0;
-    let bridgeMatRef, cityTowers = [];
+    let roadMatRef, waterMatRef;
 
     // エンティティ
     let squadMembers = [];
@@ -450,249 +484,299 @@
     let gates = [];
     let particles = [];
     let boss = null;
-    let laserWarnings = [];
+    let shellCasings = [];
+    let airstrikeBombs = [];
 
-    // --- テクスチャ自律生成 ---
-    function makeBridgeTex() {
+    // --- リアルなテクスチャ生成 ---
+    // アスファルト舗装路（白線・車線付き）
+    function createRoadTexture() {
       const cvs = document.createElement('canvas');
       cvs.width = 512; cvs.height = 512;
       const ctx = cvs.getContext('2d');
-      ctx.fillStyle = '#060a17'; ctx.fillRect(0,0,512,512);
 
-      // サイバー回路
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)'; ctx.lineWidth = 3;
-      for (let i = 0; i <= 512; i += 64) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke();
+      // 濃いアスファルトグレー
+      ctx.fillStyle = '#2b2d31';
+      ctx.fillRect(0, 0, 512, 512);
+
+      // 細かいアスファルトのざらつき
+      for (let i = 0; i < 4000; i++) {
+        ctx.fillStyle = Math.random() < 0.5 ? '#1f2024' : '#383a40';
+        ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
       }
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillRect(250, 0, 12, 512);
+
+      // 両端の路肩白線
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(16, 0, 10, 512);
+      ctx.fillRect(486, 0, 10, 512);
+
+      // 中央破線（黄線・ダブルライン）
+      ctx.fillStyle = '#f59e0b';
+      for (let y = 10; y < 512; y += 80) {
+        ctx.fillRect(250, y, 6, 45);
+        ctx.fillRect(258, y, 6, 45);
+      }
+
       return new THREE.CanvasTexture(cvs);
     }
 
-    function makeBuildingTex() {
-      const cvs = document.createElement('canvas');
-      cvs.width = 128; cvs.height = 256;
-      const ctx = cvs.getContext('2d');
-      ctx.fillStyle = '#020617'; ctx.fillRect(0,0,128,256);
-      for (let y = 8; y < 250; y += 12) {
-        for (let x = 6; x < 120; x += 14) {
-          if (Math.random() < 0.35) {
-            ctx.fillStyle = Math.random() < 0.6 ? '#0284c7' : '#ec4899';
-            ctx.fillRect(x, y, 8, 6);
-          }
-        }
-      }
-      return new THREE.CanvasTexture(cvs);
-    }
-
-    function makeGateTex(label, isPos) {
+    // きらめく海面テクスチャ
+    function createWaterTexture() {
       const cvs = document.createElement('canvas');
       cvs.width = 256; cvs.height = 256;
       const ctx = cvs.getContext('2d');
-      ctx.fillStyle = isPos ? 'rgba(2, 132, 199, 0.75)' : 'rgba(220, 38, 38, 0.75)';
+      ctx.fillStyle = '#0284c7';
       ctx.fillRect(0, 0, 256, 256);
-      ctx.strokeStyle = isPos ? '#38bdf8' : '#ff4d4d';
-      ctx.lineWidth = 16;
-      ctx.strokeRect(8, 8, 240, 240);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '900 84px -apple-system, sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.shadowColor = isPos ? '#38bdf8' : '#ff0055';
-      ctx.shadowBlur = 24;
-      ctx.fillText(label, 128, 128);
+
+      // 波紋ハイライト
+      for (let i = 0; i < 120; i++) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        const w = 20 + Math.random() * 40;
+        ctx.fillRect(Math.random() * 256, Math.random() * 256, w, 4);
+      }
       return new THREE.CanvasTexture(cvs);
     }
 
-    // --- 3Dモデル生成 ---
-    function createSoldier(isLeader = false) {
+    // 軍用作戦ゲートテクスチャ（ミリタリー標識）
+    function createMilGateTexture(label, isPos) {
+      const cvs = document.createElement('canvas');
+      cvs.width = 256; cvs.height = 256;
+      const ctx = cvs.getContext('2d');
+
+      // 背景コンテナ色
+      ctx.fillStyle = isPos ? 'rgba(30, 58, 138, 0.85)' : 'rgba(127, 29, 29, 0.85)';
+      ctx.fillRect(0, 0, 256, 256);
+
+      // ミリタリーイエローストライプ枠
+      ctx.strokeStyle = isPos ? '#38bdf8' : '#f87171';
+      ctx.lineWidth = 14;
+      ctx.strokeRect(7, 7, 242, 242);
+
+      // サブタイトル
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = 'bold 24px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(isPos ? 'REINFORCE' : 'AMBUSH', 128, 50);
+
+      // メイン文字（ステンシル調）
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 84px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, 128, 140);
+
+      return new THREE.CanvasTexture(cvs);
+    }
+
+    // --- リアル3Dモデル生成 ---
+    // 現代兵士（味方特殊部隊 / 敵歩兵）
+    function createSoldierModel(isLeader = false, isEnemy = false, enemyType = 'normal') {
       const g = new THREE.Group();
-      const col = isLeader ? 0x0284c7 : 0x0ea5e9;
 
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.65, 0.4), new THREE.MeshLambertMaterial({ color: col }));
-      body.position.y = 0.55;
-      g.add(body);
+      let vestColor = isEnemy ? 0x27272a : 0x78716c; // タクティカルベスト
+      let camoColor = isEnemy ? 0x3f3f46 : 0xa8a29e; // 迷彩服
+      let helmetColor = isEnemy ? 0x18181b : 0x57534e; // ヘルメット
 
-      // ショルダー
-      const sh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.3), new THREE.MeshLambertMaterial({ color: col }));
-      sh.position.set(-0.35, 0.75, 0);
-      const shR = sh.clone(); shR.position.x = 0.35;
-      g.add(sh, shR);
+      if (isLeader) {
+        vestColor = 0x1e3a8a; // リーダー：ブルーグレーベスト
+        camoColor = 0x475569;
+      }
+      if (enemyType === 'rpg') {
+        vestColor = 0x991b1b; // RPG兵：赤系ベスト
+      }
 
-      // 頭部
-      const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshLambertMaterial({ color: 0x1e293b }));
-      head.position.y = 1.05;
-      g.add(head);
-
-      // 発光バイザー（Bloom用 MeshBasicMaterial）
-      const visor = new THREE.Mesh(
-        new THREE.BoxGeometry(0.34, 0.14, 0.08),
-        new THREE.MeshBasicMaterial({ color: isLeader ? 0xfacc15 : 0x38bdf8 })
+      // トルソー（防弾プレートキャリア）
+      const torso = new THREE.Mesh(
+        new THREE.BoxGeometry(0.55, 0.65, 0.4),
+        new THREE.MeshLambertMaterial({ color: vestColor })
       );
-      visor.position.set(0, 1.08, -0.21);
-      g.add(visor);
+      torso.position.y = 0.55;
+      g.add(torso);
 
-      // 脚
-      const legMat = new THREE.MeshLambertMaterial({ color: 0x0f172a });
+      // 迷彩袖
+      const armMat = new THREE.MeshLambertMaterial({ color: camoColor });
+      const armL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.5, 0.2), armMat);
+      armL.position.set(-0.35, 0.6, 0.05);
+      const armR = armL.clone();
+      armR.position.x = 0.35;
+      armR.rotation.x = -Math.PI / 6; // 銃を構えるポーズ
+      g.add(armL, armR);
+
+      // ヘルメット（PASGT/FASTヘルメット）
+      const headMat = new THREE.MeshLambertMaterial({ color: helmetColor });
+      const helmet = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.38, 0.44), headMat);
+      helmet.position.y = 1.08;
+      g.add(helmet);
+
+      // ゴーグル（反射グラス）
+      const gogMat = new THREE.MeshLambertMaterial({ color: 0x0f172a });
+      const goggle = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.12, 0.08), gogMat);
+      goggle.position.set(0, 1.08, isEnemy ? 0.22 : -0.22);
+      g.add(goggle);
+
+      // アサルトライフル（M4カービン / AK風）
+      const gunMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+      const gun = new THREE.Group();
+
+      const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.65), gunMat);
+      const mag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, 0.12), gunMat);
+      mag.position.set(0, -0.12, -0.05);
+      gun.add(barrel, mag);
+
+      if (enemyType === 'rpg') {
+        // RPGロケットランチャー筒
+        const rpgTube = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.2, 8), new THREE.MeshLambertMaterial({ color: 0x3f3f46 }));
+        rpgTube.rotation.x = Math.PI / 2;
+        rpgTube.position.set(0.3, 0.85, 0);
+        g.add(rpgTube);
+      } else {
+        gun.position.set(0.28, 0.6, isEnemy ? 0.3 : -0.3);
+        if (isEnemy) gun.rotation.y = Math.PI;
+        g.add(gun);
+      }
+
+      // ライオットシールド（防弾盾）
+      if (enemyType === 'shield') {
+        const shGeo = new THREE.BoxGeometry(1.2, 1.4, 0.12);
+        const shMat = new THREE.MeshLambertMaterial({ color: 0x334155 });
+        const shield = new THREE.Mesh(shGeo, shMat);
+        shield.position.set(0, 0.7, 0.35);
+        g.add(shield);
+      }
+
+      // 脚部
+      const legMat = new THREE.MeshLambertMaterial({ color: camoColor });
       const legL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.35, 0.22), legMat);
       legL.position.set(-0.16, 0.18, 0);
-      const legR = legL.clone(); legR.position.x = 0.16;
+      const legR = legL.clone();
+      legR.position.x = 0.16;
       g.add(legL, legR);
 
       return { group: g, legL, legR };
     }
 
-    function createDroneSupport() {
+    // 巨大主力戦車（MAMMOTH TANK）
+    function createMammothTank() {
       const g = new THREE.Group();
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.06, 6, 16), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
-      ring.rotation.x = Math.PI / 2;
-      const core = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
-      g.add(ring, core);
-      return g;
+      const armorMat = new THREE.MeshLambertMaterial({ color: 0x3f3f46 }); // ガンメタル装甲
+      const treadMat = new THREE.MeshLambertMaterial({ color: 0x18181b }); // キャタピラ
+
+      // 車体本体（シャーシ）
+      const chassis = new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.4, 6.0), armorMat);
+      chassis.position.y = 1.0;
+      g.add(chassis);
+
+      // 左右キャタピラ（履帯）
+      const treadL = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.1, 6.2), treadMat);
+      treadL.position.set(-2.4, 0.7, 0);
+      const treadR = treadL.clone();
+      treadR.position.x = 2.4;
+      g.add(treadL, treadR);
+
+      // 旋回砲塔（タレット）
+      const turret = new THREE.Mesh(new THREE.BoxGeometry(3.0, 1.2, 3.2), armorMat);
+      turret.position.set(0, 2.3, -0.2);
+      g.add(turret);
+
+      // 連装主砲（2連バレル）
+      const barrelGeo = new THREE.CylinderGeometry(0.18, 0.22, 4.0, 12);
+      barrelGeo.rotateX(Math.PI / 2);
+      const gunL = new THREE.Mesh(barrelGeo, armorMat);
+      gunL.position.set(-0.7, 2.3, 2.8);
+      const gunR = gunL.clone();
+      gunR.position.x = 0.7;
+      g.add(gunL, gunR);
+
+      return { group: g, treadL, treadR, turret };
     }
 
-    function createEnemy(type) {
-      const g = new THREE.Group();
-
-      if (type === 'drone') {
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.08, 6, 16), new THREE.MeshBasicMaterial({ color: 0xa855f7 }));
-        ring.rotation.x = Math.PI / 2;
-        ring.position.y = 1.2;
-        const core = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), new THREE.MeshLambertMaterial({ color: 0x111827 }));
-        core.position.y = 1.2;
-        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff0055 }));
-        eye.position.set(0, 1.2, 0.22);
-        g.add(ring, core, eye);
-      } else if (type === 'heavy') {
-        const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.3, 0.8), new THREE.MeshLambertMaterial({ color: 0x334155 }));
-        body.position.y = 0.8;
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.5), new THREE.MeshLambertMaterial({ color: 0xf59e0b }));
-        head.position.y = 1.6;
-        // シールド
-        const sh = new THREE.Mesh(
-          new THREE.PlaneGeometry(1.6, 1.6),
-          new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
-        );
-        sh.position.set(0, 1.0, 0.6);
-        g.add(body, head, sh);
-        g.shieldMesh = sh;
-      } else {
-        const b = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.65, 0.4), new THREE.MeshLambertMaterial({ color: 0xef4444 }));
-        b.position.y = 0.55;
-        const h = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), new THREE.MeshLambertMaterial({ color: 0x111827 }));
-        h.position.y = 1.05;
-        const eye = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.1), new THREE.MeshBasicMaterial({ color: 0xff0055 }));
-        eye.position.set(0, 1.08, 0.2);
-        g.add(b, h, eye);
-      }
-      return g;
-    }
-
-    // 部位破壊対応タイタンボス
-    function createTitanBoss() {
-      const g = new THREE.Group();
-      // メインシャーシ
-      const body = new THREE.Mesh(new THREE.BoxGeometry(3.2, 3.4, 2.2), new THREE.MeshLambertMaterial({ color: 0x1e1e2f }));
-      body.position.y = 2.8;
-
-      // 巨大コア（発光）
-      const core = new THREE.Mesh(new THREE.SphereGeometry(0.85, 12, 12), new THREE.MeshBasicMaterial({ color: 0xff0055 }));
-      core.position.set(0, 2.8, 1.15);
-
-      // 頭部
-      const head = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.4, 1.4), new THREE.MeshLambertMaterial({ color: 0x090a0f }));
-      head.position.y = 5.0;
-
-      // 左右キャノン（破壊可能部位）
-      const podMat = new THREE.MeshLambertMaterial({ color: 0x991b1b });
-      const cannonL = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.4, 2.2), podMat);
-      cannonL.position.set(-2.2, 4.0, 0);
-      const cannonR = cannonL.clone();
-      cannonR.position.x = 2.2;
-
-      g.add(body, core, head, cannonL, cannonR);
-      return { group: g, cannonL, cannonR, core };
-    }
-
-    // --- 初期セットアップ ---
+    // --- 初期化 ---
     function init() {
       const container = document.getElementById('game-container');
       const w = container.clientWidth;
       const h = container.clientHeight;
 
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x010409);
-      scene.fog = new THREE.FogExp2(0x010409, 0.016);
+      // 快晴の青空
+      scene.background = new THREE.Color(0x7dd3fc);
+      scene.fog = new THREE.FogExp2(0xbae6fd, 0.008);
 
-      camera = new THREE.PerspectiveCamera(54, w / h, 0.1, 260);
+      camera = new THREE.PerspectiveCamera(54, w / h, 0.1, 300);
       camera.position.set(0, 16, 24);
       camera.lookAt(0, 1, 0);
 
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(w, h);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.1;
+      renderer.shadowMap.enabled = true;
       container.appendChild(renderer.domElement);
 
-      // ポストプロセッシング（Unreal Bloom）
-      const renderPass = new THREE.RenderPass(scene, camera);
-      const bloomPass = new THREE.UnrealBloomPass(
-        new THREE.Vector2(w, h),
-        1.1,  // 強度 (strength)
-        0.35, // 半径 (radius)
-        0.28  // しきい値 (threshold)
+      // 太陽光ライティング（快晴の自然な昼光）
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+      scene.add(ambientLight);
+
+      const sunLight = new THREE.DirectionalLight(0xfffbeb, 1.2);
+      sunLight.position.set(15, 35, 20);
+      scene.add(sunLight);
+
+      // 1. 海面（巨大なブルーウォータープレーン）
+      const waterTex = createWaterTexture();
+      waterTex.wrapS = THREE.RepeatWrapping; waterTex.wrapT = THREE.RepeatWrapping;
+      waterTex.repeat.set(16, 32);
+      waterMatRef = waterTex;
+      const sea = new THREE.Mesh(
+        new THREE.PlaneGeometry(300, 400),
+        new THREE.MeshLambertMaterial({ map: waterTex })
       );
-      composer = new THREE.EffectComposer(renderer);
-      composer.addPass(renderPass);
-      composer.addPass(bloomPass);
+      sea.rotation.x = -Math.PI / 2;
+      sea.position.set(0, -18, -40);
+      scene.add(sea);
 
-      // ライト
-      const hemi = new THREE.HemisphereLight(0x38bdf8, 0x010409, 0.8);
-      scene.add(hemi);
+      // 2. 巨大ベイブリッジ（アスファルト道路）
+      const roadTex = createRoadTexture();
+      roadTex.wrapS = THREE.RepeatWrapping; roadTex.wrapT = THREE.RepeatWrapping;
+      roadTex.repeat.set(1, 16);
+      roadMatRef = roadTex;
 
-      const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-      dir.position.set(10, 25, 15);
-      scene.add(dir);
+      const road = new THREE.Mesh(
+        new THREE.BoxGeometry(BRIDGE_WIDTH, 1.0, 130),
+        new THREE.MeshLambertMaterial({ map: roadTex })
+      );
+      road.position.set(0, -0.5, -35);
+      scene.add(road);
 
-      // 背景ビル群
-      const bTex = makeBuildingTex();
-      bTex.wrapS = THREE.RepeatWrapping; bTex.wrapT = THREE.RepeatWrapping;
-      const bMat = new THREE.MeshBasicMaterial({ map: bTex });
-      for (let i = 0; i < 40; i++) {
-        const bh = 15 + Math.random() * 45;
-        const bw = 5 + Math.random() * 6;
-        const bMesh = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bw), bMat);
-        const side = i % 2 === 0 ? 1 : -1;
-        bMesh.position.set(side * (16 + Math.random() * 45), bh / 2 - 25, -90 + Math.random() * 120);
-        scene.add(bMesh);
-        cityTowers.push(bMesh);
+      // 3. 金属ガードレール
+      const railMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
+      const railL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.7, 130), railMat);
+      railL.position.set(-BRIDGE_WIDTH / 2, 0.35, -35);
+      const railR = railL.clone();
+      railR.position.x = BRIDGE_WIDTH / 2;
+      scene.add(railL, railR);
+
+      // 4. 吊り橋の主塔（白いタワー）＆ケーブルワイヤー
+      const towerMat = new THREE.MeshLambertMaterial({ color: 0xe2e8f0 });
+      for (let z of [-80, -20]) {
+        const pillarL = new THREE.Mesh(new THREE.BoxGeometry(1.2, 45, 1.8), towerMat);
+        pillarL.position.set(-BRIDGE_WIDTH / 2 - 1.2, 20, z);
+        const pillarR = pillarL.clone();
+        pillarR.position.x = BRIDGE_WIDTH / 2 + 1.2;
+        const beam = new THREE.Mesh(new THREE.BoxGeometry(BRIDGE_WIDTH + 4, 1.8, 1.8), towerMat);
+        beam.position.set(0, 38, z);
+        scene.add(pillarL, pillarR, beam);
       }
 
-      // 橋
-      const bridgeTex = makeBridgeTex();
-      bridgeTex.wrapS = THREE.RepeatWrapping; bridgeTex.wrapT = THREE.RepeatWrapping;
-      bridgeTex.repeat.set(1, 16);
-      bridgeMatRef = bridgeTex;
+      // 吊り橋メインケーブル
+      const cableMat = new THREE.MeshBasicMaterial({ color: 0x64748b });
+      const cableL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 130), cableMat);
+      cableL.rotation.x = Math.PI / 2;
+      cableL.position.set(-BRIDGE_WIDTH / 2 - 1.2, 38, -35);
+      const cableR = cableL.clone();
+      cableR.position.x = BRIDGE_WIDTH / 2 + 1.2;
+      scene.add(cableL, cableR);
 
-      const bridge = new THREE.Mesh(
-        new THREE.BoxGeometry(BRIDGE_WIDTH, 0.8, 120),
-        new THREE.MeshLambertMaterial({ map: bridgeTex })
-      );
-      bridge.position.set(0, -0.4, -35);
-      scene.add(bridge);
-
-      // レール（発光）
-      const railGeo = new THREE.BoxGeometry(0.35, 0.6, 120);
-      const railMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-      const rL = new THREE.Mesh(railGeo, railMat);
-      rL.position.set(-BRIDGE_WIDTH / 2, 0.3, -35);
-      const rR = rL.clone(); rR.position.x = BRIDGE_WIDTH / 2;
-      scene.add(rL, rR);
-
-      // 防衛ライン
+      // 防衛ライン（黄色と黒の警戒ハザードライン）
       const defLine = new THREE.Mesh(
         new THREE.BoxGeometry(BRIDGE_WIDTH, 0.06, 0.4),
-        new THREE.MeshBasicMaterial({ color: 0xff0055 })
+        new THREE.MeshLambertMaterial({ color: 0xfacc15 })
       );
       defLine.position.set(0, 0.05, DEFENSE_Z + 1.2);
       scene.add(defLine);
@@ -704,7 +788,7 @@
       animate();
     }
 
-    // --- 操作 ---
+    // --- 入力制御 ---
     function setupTouchControls() {
       let isDrag = false;
       let startX = 0;
@@ -729,10 +813,10 @@
 
     function setupUltButton() {
       const btn = document.getElementById('ult-btn');
-      btn.addEventListener('click', triggerUltimate);
+      btn.addEventListener('click', triggerAirstrike);
       btn.addEventListener('touchstart', (e) => {
         e.stopPropagation();
-        triggerUltimate();
+        triggerAirstrike();
       });
     }
 
@@ -741,10 +825,9 @@
       camera.aspect = c.clientWidth / c.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(c.clientWidth, c.clientHeight);
-      composer.setSize(c.clientWidth, c.clientHeight);
     }
 
-    // --- 部隊配置 ---
+    // --- 部隊編成 ---
     function updateSquadLayout() {
       document.getElementById('squad-text').innerText = squadMembers.length;
       squadMembers.forEach((m, idx) => {
@@ -758,11 +841,11 @@
     }
 
     function addSquad(cnt) {
-      playSfx('laser');
+      playSfx('rifle');
       const cur = squadMembers.length;
-      const target = Math.min(65, cur + cnt);
+      const target = Math.min(60, cur + cnt);
       for (let i = cur; i < target; i++) {
-        const u = createSoldier(false);
+        const u = createSoldierModel(false, false);
         u.group.position.set(playerLeaderX, 0, DEFENSE_Z);
         u.group.scale.set(0.1, 0.1, 0.1);
         scene.add(u.group);
@@ -773,12 +856,12 @@
 
     function removeSquad(cnt) {
       if (squadMembers.length <= 1) return;
-      playSfx('explode');
-      shakeIntensity = 0.45;
+      playSfx('impact');
+      shakeIntensity = 0.4;
       const removeCnt = Math.min(cnt, squadMembers.length - 1);
       for (let i = 0; i < removeCnt; i++) {
         const m = squadMembers.pop();
-        spawnParticles(m.mesh.position.x, 0.6, m.mesh.position.z, 0xff0055, 10);
+        spawnDebris(m.mesh.position.x, 0.6, m.mesh.position.z, 0xef4444, 8);
         scene.remove(m.mesh);
       }
       updateSquadLayout();
@@ -790,12 +873,12 @@
       const w = BRIDGE_WIDTH / 2 - 0.35;
       const leftGood = Math.random() < 0.5;
 
-      const g1 = createGate(leftGood ? 6 : -4, leftGood, -w / 2 - 0.15, z, w);
-      const g2 = createGate(!leftGood ? 6 : -4, !leftGood, w / 2 + 0.15, z, w);
+      const g1 = createMilGate(leftGood ? 6 : -4, leftGood, -w / 2 - 0.15, z, w);
+      const g2 = createMilGate(!leftGood ? 6 : -4, !leftGood, w / 2 + 0.15, z, w);
       gates.push(g1, g2);
     }
 
-    function createGate(val, isPos, x, z, width) {
+    function createMilGate(val, isPos, x, z, width) {
       const g = new THREE.Group();
       const panel = new THREE.Mesh(
         new THREE.PlaneGeometry(width, 2.8),
@@ -804,26 +887,30 @@
       panel.position.y = 1.5;
       g.add(panel);
 
-      const pL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.2, 0.2), new THREE.MeshBasicMaterial({ color: isPos ? 0x38bdf8 : 0xff0055 }));
+      // 頑丈な鋼鉄アーチフレーム
+      const frameMat = new THREE.MeshLambertMaterial({ color: 0x334155 });
+      const pL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.2, 0.3), frameMat);
       pL.position.set(-width / 2, 1.5, 0);
       const pR = pL.clone(); pR.position.x = width / 2;
-      g.add(pL, pR);
+      const topBar = new THREE.Mesh(new THREE.BoxGeometry(width + 0.3, 0.3, 0.3), frameMat);
+      topBar.position.set(0, 3.0, 0);
+      g.add(pL, pR, topBar);
 
       g.position.set(x, 0, z);
       scene.add(g);
 
       const obj = { mesh: g, panel, val, isPos, width, applied: false };
-      updateGateLabel(obj);
+      updateGateTexture(obj);
       return obj;
     }
 
-    function updateGateLabel(g) {
+    function updateGateTexture(g) {
       const txt = g.isPos ? `+${g.val}` : `${g.val}`;
-      g.panel.material.map = makeGateTex(txt, g.isPos);
+      g.panel.material.map = createMilGateTexture(txt, g.isPos);
       g.panel.material.needsUpdate = true;
     }
 
-    // --- ダメージポップアップ演出 ---
+    // --- ダメージ表示演出 ---
     function showDamageNumber(val, x, y, z, isCrit = false) {
       const vector = new THREE.Vector3(x, y, z);
       vector.project(camera);
@@ -847,51 +934,69 @@
       });
     }
 
-    // --- アルティメット発動（軌道爆撃） ---
-    function triggerUltimate() {
+    // --- 空爆支援（AIRSTRIKE） ---
+    function triggerAirstrike() {
       if (!isUltReady || !isPlaying) return;
       isUltReady = false;
       ultGauge = 0;
       updateUltUi();
 
-      playSfx('orbital');
+      playSfx('airstrike');
       shakeIntensity = 1.2;
 
-      // 敵弾を全消滅
+      // 敵弾消滅
       enemyBullets.forEach(eb => scene.remove(eb.mesh));
       enemyBullets = [];
 
-      // 軌道ビーム（極太シリンダー）
-      const beamGeo = new THREE.CylinderGeometry(4.5, 4.5, 100, 16);
-      const beamMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.8 });
-      const beam = new THREE.Mesh(beamGeo, beamMat);
-      beam.position.set(playerLeaderX, 40, -15);
-      scene.add(beam);
+      // ジェット戦闘機モデル（高速で画面上空を通過）
+      const jet = new THREE.Mesh(
+        new THREE.ConeGeometry(0.8, 4.0, 4),
+        new THREE.MeshLambertMaterial({ color: 0x475569 })
+      );
+      jet.rotation.x = Math.PI / 2;
+      jet.position.set(playerLeaderX, 22, DEFENSE_Z + 15);
+      scene.add(jet);
 
-      // 画面上の全敵に大ダメージ
-      for (let i = enemies.length - 1; i >= 0; i--) {
-        const e = enemies[i];
-        e.hp -= 25;
-        showDamageNumber(25, e.mesh.position.x, 1, e.mesh.position.z, true);
-        if (e.hp <= 0) {
-          spawnParticles(e.mesh.position.x, 0.7, e.mesh.position.z, 0xff0055, 15);
-          scene.remove(e.mesh);
-          enemies.splice(i, 1);
-          score += 30;
-        }
-      }
-
-      if (boss) {
-        boss.hp -= 40;
-        showDamageNumber(40, boss.mesh.position.x, 3, boss.mesh.position.z, true);
-        updateBossHp();
-      }
-
-      gsap.to(beamMat, {
-        opacity: 0,
+      gsap.to(jet.position, {
+        z: -90,
         duration: 0.8,
-        onComplete: () => scene.remove(beam)
+        ease: 'none',
+        onComplete: () => scene.remove(jet)
       });
+
+      // 連続クラスター爆弾投下
+      for (let k = 0; k < 6; k++) {
+        setTimeout(() => {
+          if (!isPlaying) return;
+          const boomZ = -10 - k * 8;
+          const boomX = (Math.random() - 0.5) * (BRIDGE_WIDTH - 2);
+
+          playSfx('explosion');
+          shakeIntensity = 0.8;
+          spawnExplosionSmoke(boomX, 0.5, boomZ, 35);
+
+          // 敵全滅判定
+          for (let i = enemies.length - 1; i >= 0; i--) {
+            const e = enemies[i];
+            if (Math.abs(e.mesh.position.z - boomZ) < 6.0) {
+              e.hp -= 30;
+              showDamageNumber(30, e.mesh.position.x, 1, e.mesh.position.z, true);
+              if (e.hp <= 0) {
+                spawnDebris(e.mesh.position.x, 0.7, e.mesh.position.z, 0xef4444, 15);
+                scene.remove(e.mesh);
+                enemies.splice(i, 1);
+                score += 35;
+              }
+            }
+          }
+
+          if (boss && Math.abs(boss.mesh.position.z - boomZ) < 8.0) {
+            boss.hp -= 25;
+            showDamageNumber(25, boss.mesh.position.x, 2.5, boss.mesh.position.z, true);
+            updateBossHp();
+          }
+        }, k * 120);
+      }
     }
 
     function chargeUlt(amt) {
@@ -899,7 +1004,6 @@
       ultGauge = Math.min(100, ultGauge + amt);
       if (ultGauge >= 100) {
         isUltReady = true;
-        playSfx('laser');
       }
       updateUltUi();
     }
@@ -915,7 +1019,7 @@
       }
     }
 
-    // --- ローグライク報酬選択 ---
+    // --- ローグライク補給選択 ---
     function showUpgradeSelection() {
       isPlaying = false;
       const screen = document.getElementById('upgrade-screen');
@@ -923,9 +1027,9 @@
       container.innerHTML = '';
 
       const options = [
-        { id: 'rate', title: '⚡ 超電導アクセラレータ', desc: '部隊の連射速度が＋35%向上する' },
-        { id: 'drone', title: '🛰 支援自律ドローン', desc: '自機の周囲を旋回しながら自動射撃するドローンを展開' },
-        { id: 'bounce', title: '💥 跳弾バレット', desc: '弾丸が敵に当たると隣接する敵へ跳弾する' }
+        { id: 'rate', title: '⚡ 高速連射マガジン', desc: 'アサルトライフルの連射速度が＋35%向上する' },
+        { id: 'pierce', title: '🎯 徹甲弾（AP弾）', desc: '弾丸が敵兵を貫通し、重装甲シールドを破砕する' },
+        { id: 'gunship', title: '🚁 攻撃ヘリ支援旋回', desc: '上空からガトリング機銃で援護射撃を行う支援ヘリを展開' }
       ];
 
       options.forEach(opt => {
@@ -944,33 +1048,40 @@
     }
 
     function applyUpgrade(id) {
-      if (id === 'rate') fireRateMultiplier *= 1.35;
-      if (id === 'bounce') hasBounceBullets = true;
-      if (id === 'drone' && !hasSupportDrone) {
-        hasSupportDrone = true;
-        droneMesh = createDroneSupport();
-        scene.add(droneMesh);
+      if (id === 'rate') fireRateMult *= 1.35;
+      if (id === 'pierce') hasArmorPiercing = true;
+      if (id === 'gunship' && !hasGunshipSupport) {
+        hasGunshipSupport = true;
+        // 攻撃ヘリモデル
+        const hg = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.7, 2.2), new THREE.MeshLambertMaterial({ color: 0x334155 }));
+        const rotor = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.06, 0.2), new THREE.MeshBasicMaterial({ color: 0x0f172a }));
+        rotor.position.y = 0.45;
+        hg.add(body, rotor);
+        hg.rotor = rotor;
+        gunshipMesh = hg;
+        scene.add(gunshipMesh);
       }
-      playSfx('laser');
+      playSfx('rifle');
     }
 
-    // --- スタート & リセット ---
+    // --- スタート / リセット ---
     function startGame() {
       initAudio();
       document.getElementById('start-screen').style.display = 'none';
       document.getElementById('result-screen').style.display = 'none';
       document.getElementById('upgrade-screen').style.display = 'none';
 
-      // 消去
+      // 既存オブジェクト消去
       squadMembers.forEach(m => scene.remove(m.mesh));
       bullets.forEach(b => scene.remove(b.mesh));
       enemyBullets.forEach(b => scene.remove(b.mesh));
       enemies.forEach(e => scene.remove(e.mesh));
       gates.forEach(g => scene.remove(g.mesh));
       particles.forEach(p => scene.remove(p.mesh));
-      laserWarnings.forEach(lw => scene.remove(lw.mesh));
+      shellCasings.forEach(sc => scene.remove(sc.mesh));
       if (boss) scene.remove(boss.mesh);
-      if (droneMesh) scene.remove(droneMesh);
+      if (gunshipMesh) scene.remove(gunshipMesh);
 
       squadMembers = [];
       bullets = [];
@@ -978,9 +1089,9 @@
       enemies = [];
       gates = [];
       particles = [];
-      laserWarnings = [];
+      shellCasings = [];
       boss = null;
-      droneMesh = null;
+      gunshipMesh = null;
 
       score = 0;
       gameTime = 0;
@@ -990,13 +1101,14 @@
       shakeIntensity = 0;
       ultGauge = 0;
       isUltReady = false;
-      fireRateMultiplier = 1.0;
-      hasBounceBullets = false;
-      hasSupportDrone = false;
+      fireRateMult = 1.0;
+      hasArmorPiercing = false;
+      hasGunshipSupport = false;
       playerLeaderX = 0;
       targetX = 0;
 
-      const leader = createSoldier(true);
+      // 自軍リーダー
+      const leader = createSoldierModel(true, false);
       leader.group.position.set(0, 0, DEFENSE_Z);
       scene.add(leader.group);
       squadMembers.push({ mesh: leader.group, legL: leader.legL, legR: leader.legR, offsetX: 0, offsetZ: 0 });
@@ -1009,17 +1121,60 @@
       isPlaying = true;
     }
 
-    function spawnParticles(x, y, z, color, count = 12) {
+    // 薬莢排出パーティクル
+    function spawnCasing(x, y, z) {
+      const casing = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.04, 0.12, 6),
+        new THREE.MeshLambertMaterial({ color: 0xfacc15 }) // 真鍮色
+      );
+      casing.rotation.z = Math.PI / 2;
+      casing.position.set(x, y, z);
+      scene.add(casing);
+
+      shellCasings.push({
+        mesh: casing,
+        vx: 0.08 + Math.random() * 0.05,
+        vy: 0.12 + Math.random() * 0.08,
+        vz: (Math.random() - 0.5) * 0.05,
+        life: 0.4
+      });
+    }
+
+    // 破片・血煙・土煙
+    function spawnDebris(x, y, z, color, count = 10) {
       for (let i = 0; i < count; i++) {
-        const p = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.16), new THREE.MeshBasicMaterial({ color }));
+        const p = new THREE.Mesh(
+          new THREE.BoxGeometry(0.14, 0.14, 0.14),
+          new THREE.MeshLambertMaterial({ color })
+        );
         p.position.set(x, y, z);
         scene.add(p);
         particles.push({
           mesh: p,
           vx: (Math.random() - 0.5) * 0.35,
-          vy: Math.random() * 0.35 + 0.1,
+          vy: Math.random() * 0.3 + 0.1,
           vz: (Math.random() - 0.5) * 0.35,
-          life: 0.6
+          life: 0.55
+        });
+      }
+    }
+
+    // 爆発の黒煙＆火炎パーティクル
+    function spawnExplosionSmoke(x, y, z, count = 25) {
+      for (let i = 0; i < count; i++) {
+        const isFire = Math.random() < 0.4;
+        const p = new THREE.Mesh(
+          new THREE.SphereGeometry(0.3 + Math.random() * 0.25, 6, 6),
+          new THREE.MeshLambertMaterial({ color: isFire ? 0xf97316 : 0x1f2937 })
+        );
+        p.position.set(x, y, z);
+        scene.add(p);
+        particles.push({
+          mesh: p,
+          vx: (Math.random() - 0.5) * 0.4,
+          vy: Math.random() * 0.45 + 0.15,
+          vz: (Math.random() - 0.5) * 0.4,
+          life: 0.7
         });
       }
     }
@@ -1032,7 +1187,7 @@
 
     // --- メインループ ---
     let shootCool = 0;
-    let droneAngle = 0;
+    let gunshipAngle = 0;
 
     function animate() {
       requestAnimationFrame(animate);
@@ -1041,17 +1196,18 @@
       if (isPlaying) {
         gameTime += delta;
 
-        // BGM更新
+        // BGMビート
         bgmTimer -= delta;
         if (bgmTimer <= 0) {
           stepBgm();
-          bgmTimer = 0.12;
+          bgmTimer = 0.13;
         }
 
-        // 床スクロール
-        if (bridgeMatRef) bridgeMatRef.offset.y -= 0.012;
+        // 海面と道路のテクスチャスクロール（前進感）
+        if (roadMatRef) roadMatRef.offset.y -= 0.012;
+        if (waterMatRef) waterMatRef.offset.y -= 0.006;
 
-        // シェイク
+        // カメラシェイク
         if (shakeIntensity > 0) {
           camera.position.x = (Math.random() - 0.5) * shakeIntensity;
           camera.position.y = 16 + (Math.random() - 0.5) * shakeIntensity;
@@ -1062,17 +1218,18 @@
         // プレイヤー移動追従
         playerLeaderX += (targetX - playerLeaderX) * 0.22;
 
-        // ドローン旋回
-        if (hasSupportDrone && droneMesh) {
-          droneAngle += 0.06;
-          droneMesh.position.set(
-            playerLeaderX + Math.cos(droneAngle) * 1.8,
-            1.6,
-            DEFENSE_Z + Math.sin(droneAngle) * 1.8
+        // 支援ヘリ旋回
+        if (hasGunshipSupport && gunshipMesh) {
+          gunshipAngle += 0.04;
+          gunshipMesh.rotor.rotation.y += 0.4; // ローター高速回転
+          gunshipMesh.position.set(
+            playerLeaderX + Math.cos(gunshipAngle) * 3.0,
+            4.5,
+            DEFENSE_Z + Math.sin(gunshipAngle) * 2.0
           );
         }
 
-        // 部隊歩行
+        // 部隊歩行アニメーション
         const walkCycle = Math.sin(gameTime * 24);
         squadMembers.forEach(m => {
           m.mesh.position.x += (playerLeaderX + m.offsetX - m.mesh.position.x) * 0.25;
@@ -1083,25 +1240,39 @@
           m.mesh.position.y = Math.abs(walkCycle) * 0.08;
         });
 
-        // プレイヤー射撃
+        // プレイヤー小隊の一斉射撃
         shootCool -= delta;
-        const cooldown = 0.14 / fireRateMultiplier;
+        const cooldown = 0.14 / fireRateMult;
         if (shootCool <= 0) {
           shootCool = cooldown;
-          playSfx('laser');
+          playSfx('rifle');
+
           squadMembers.forEach(m => {
-            const b = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 6), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
-            b.position.set(m.mesh.position.x, 0.6, m.mesh.position.z - 0.4);
+            // オレンジ色に光る曳光弾（トレーサー）
+            const b = new THREE.Mesh(
+              new THREE.SphereGeometry(0.16, 5, 5),
+              new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+            );
+            b.position.set(m.mesh.position.x + 0.28, 0.6, m.mesh.position.z - 0.4);
             scene.add(b);
-            bullets.push({ mesh: b, vz: -0.68, vx: (Math.random() - 0.5) * 0.03, bounced: false });
+
+            bullets.push({
+              mesh: b,
+              vz: -0.75,
+              vx: (Math.random() - 0.5) * 0.02,
+              penetration: hasArmorPiercing ? 2 : 1
+            });
+
+            // 薬莢排出
+            spawnCasing(m.mesh.position.x + 0.35, 0.65, m.mesh.position.z - 0.2);
           });
 
-          // ドローン射撃
-          if (hasSupportDrone && droneMesh) {
-            const db = new THREE.Mesh(new THREE.SphereGeometry(0.25, 6, 6), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
-            db.position.copy(droneMesh.position);
-            scene.add(db);
-            bullets.push({ mesh: db, vz: -0.75, vx: 0, isCrit: true, bounced: false });
+          // 支援ヘリのガトリング射撃
+          if (hasGunshipSupport && gunshipMesh) {
+            const hb = new THREE.Mesh(new THREE.SphereGeometry(0.2, 5, 5), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
+            hb.position.copy(gunshipMesh.position);
+            scene.add(hb);
+            bullets.push({ mesh: hb, vz: -0.85, vx: 0, penetration: 2, isCrit: true });
           }
         }
 
@@ -1112,63 +1283,62 @@
           gateTimer = 8.5;
         }
 
-        // 敵スポーン
+        // 敵部隊スポーン
         spawnTimer -= delta;
         if (spawnTimer <= 0 && !boss) {
-          const types = ['normal', 'normal', 'drone', 'heavy'];
+          const types = ['normal', 'normal', 'rpg', 'shield'];
           const type = types[Math.floor(Math.random() * types.length)];
           const laneW = (BRIDGE_WIDTH - 2) / 3;
           const x = (Math.floor(Math.random() * 3) - 1) * laneW;
 
-          const eMesh = createEnemy(type);
-          eMesh.position.set(x, 0, -65);
-          scene.add(eMesh);
+          const eMesh = createSoldierModel(false, true, type);
+          eMesh.group.position.set(x, 0, -65);
+          scene.add(eMesh.group);
 
           let hp = 4; let spd = 0.11;
-          if (type === 'drone') { hp = 3; spd = 0.14; }
-          if (type === 'heavy') { hp = 15; spd = 0.045; }
+          if (type === 'rpg') { hp = 3; spd = 0.12; }
+          if (type === 'shield') { hp = 14; spd = 0.05; }
 
           enemies.push({
-            mesh: eMesh,
+            mesh: eMesh.group,
             hp,
             type,
             speed: spd,
-            shootCool: Math.random() * 1.4 + 0.8,
-            slideDir: Math.random() < 0.5 ? 1 : -1
+            shootCool: Math.random() * 1.5 + 0.8
           });
 
           spawnTimer = Math.max(0.45, 1.2 - gameTime * 0.015);
         }
 
-        // Wave 突破によるローグライク選択（20秒経過で1回目）
+        // Wave 補給選択
         if (waveCount === 1 && gameTime > 20) {
           waveCount = 2;
           showUpgradeSelection();
         }
 
-        // ボス出現（42秒経過またはスコア到達）
+        // 重戦車ボスの出現（42秒経過またはスコア到達）
         if (!boss && (gameTime > 42 || score >= 380)) {
-          const bossObj = createTitanBoss();
-          bossObj.group.position.set(0, 0, -75);
-          scene.add(bossObj.group);
+          const tankObj = createMammothTank();
+          tankObj.group.position.set(0, 0, -75);
+          scene.add(tankObj.group);
 
           boss = {
-            mesh: bossObj.group,
-            cannonL: bossObj.cannonL,
-            cannonR: bossObj.cannonR,
-            core: bossObj.core,
-            cannonL_Hp: 30,
-            cannonR_Hp: 30,
-            hp: 240,
-            maxHp: 240,
-            speed: 0.026,
-            attackCool: 2.5
+            mesh: tankObj.group,
+            treadL: tankObj.treadL,
+            treadR: tankObj.treadR,
+            treadL_Hp: 35,
+            treadR_Hp: 35,
+            hp: 250,
+            maxHp: 250,
+            speed: 0.024,
+            cannonCool: 3.0
           };
           document.getElementById('boss-hud').style.display = 'flex';
           shakeIntensity = 0.8;
+          playSfx('explosion');
         }
 
-        // --- 1. 弾丸の判定 ---
+        // --- 1. 弾丸の挙動と着弾判定 ---
         for (let i = bullets.length - 1; i >= 0; i--) {
           const b = bullets[i];
           b.mesh.position.z += b.vz;
@@ -1182,22 +1352,22 @@
 
           let hit = false;
 
-          // ゲート射撃
+          // 作戦ゲートへの射撃
           for (let g of gates) {
             if (Math.abs(b.mesh.position.z - g.mesh.position.z) < 0.6 &&
                 Math.abs(b.mesh.position.x - g.mesh.position.x) < g.width / 2) {
               hit = true;
               if (g.isPos) {
                 g.val = Math.min(30, g.val + 1);
-                updateGateLabel(g);
-                spawnParticles(b.mesh.position.x, 1.5, b.mesh.position.z, 0x38bdf8, 3);
+                updateGateTexture(g);
+                spawnDebris(b.mesh.position.x, 1.5, b.mesh.position.z, 0x38bdf8, 3);
               } else {
                 g.val = Math.min(0, g.val + 1);
-                updateGateLabel(g);
-                spawnParticles(b.mesh.position.x, 1.5, b.mesh.position.z, 0xff0055, 3);
+                updateGateTexture(g);
+                spawnDebris(b.mesh.position.x, 1.5, b.mesh.position.z, 0xef4444, 3);
                 if (g.val >= 0) {
-                  playSfx('explode');
-                  spawnParticles(g.mesh.position.x, 1.5, g.mesh.position.z, 0xfacc15, 25);
+                  playSfx('explosion');
+                  spawnExplosionSmoke(g.mesh.position.x, 1.5, g.mesh.position.z, 20);
                   scene.remove(g.mesh);
                   gates.splice(gates.indexOf(g), 1);
                 }
@@ -1206,7 +1376,7 @@
             }
           }
 
-          // 敵着弾
+          // 敵歩兵への着弾
           if (!hit) {
             for (let j = enemies.length - 1; j >= 0; j--) {
               const e = enemies[j];
@@ -1214,26 +1384,20 @@
                 const isCrit = b.isCrit || Math.random() < 0.2;
                 const dmg = isCrit ? 3 : 1;
                 e.hp -= dmg;
-                hit = true;
+                b.penetration--;
+                if (b.penetration <= 0) hit = true;
+
                 chargeUlt(2.5);
-
-                playSfx('hit');
+                playSfx('impact');
                 showDamageNumber(dmg, b.mesh.position.x, 1.2, b.mesh.position.z, isCrit);
-                spawnParticles(b.mesh.position.x, 0.7, b.mesh.position.z, 0xfacc15, 3);
-
-                // 跳弾処理
-                if (hasBounceBullets && !b.bounced && enemies.length > 1) {
-                  b.bounced = true;
-                  b.vx = (Math.random() - 0.5) * 0.15;
-                  hit = false; // 消滅させずに跳弾
-                }
+                spawnDebris(b.mesh.position.x, 0.7, b.mesh.position.z, 0xef4444, 4);
 
                 if (e.hp <= 0) {
-                  spawnParticles(e.mesh.position.x, 0.7, e.mesh.position.z, 0xff0055, 14);
-                  playSfx('explode');
+                  spawnExplosionSmoke(e.mesh.position.x, 0.5, e.mesh.position.z, 12);
+                  playSfx('impact');
                   scene.remove(e.mesh);
                   enemies.splice(j, 1);
-                  score += e.type === 'heavy' ? 40 : 15;
+                  score += e.type === 'shield' ? 40 : 15;
                   document.getElementById('score-text').innerText = score;
                 }
                 break;
@@ -1241,47 +1405,47 @@
             }
           }
 
-          // ボス着弾（部位破壊＆コア）
+          // 重戦車ボスへの着弾（キャタピラ部位破壊 & 車体）
           if (!hit && boss) {
             const bx = boss.mesh.position.x;
             const bz = boss.mesh.position.z;
 
-            // 左キャノン
-            if (boss.cannonL_Hp > 0 && Math.abs(b.mesh.position.x - (bx - 2.2)) < 0.8 && Math.abs(b.mesh.position.z - bz) < 1.5) {
-              boss.cannonL_Hp -= 1;
+            // 左キャタピラ
+            if (boss.treadL_Hp > 0 && Math.abs(b.mesh.position.x - (bx - 2.4)) < 0.9 && Math.abs(b.mesh.position.z - bz) < 2.5) {
+              boss.treadL_Hp -= 1;
               hit = true;
-              showDamageNumber(1, bx - 2.2, 4.0, bz);
-              if (boss.cannonL_Hp <= 0) {
-                spawnParticles(bx - 2.2, 4.0, bz, 0xff0055, 25);
-                playSfx('explode');
-                boss.cannonL.visible = false;
+              showDamageNumber(1, bx - 2.4, 1.0, bz);
+              if (boss.treadL_Hp <= 0) {
+                spawnExplosionSmoke(bx - 2.4, 1.0, bz, 20);
+                playSfx('explosion');
+                boss.speed *= 0.6; // 移動速度激減！
               }
             }
-            // 右キャノン
-            else if (boss.cannonR_Hp > 0 && Math.abs(b.mesh.position.x - (bx + 2.2)) < 0.8 && Math.abs(b.mesh.position.z - bz) < 1.5) {
-              boss.cannonR_Hp -= 1;
+            // 右キャタピラ
+            else if (boss.treadR_Hp > 0 && Math.abs(b.mesh.position.x - (bx + 2.4)) < 0.9 && Math.abs(b.mesh.position.z - bz) < 2.5) {
+              boss.treadR_Hp -= 1;
               hit = true;
-              showDamageNumber(1, bx + 2.2, 4.0, bz);
-              if (boss.cannonR_Hp <= 0) {
-                spawnParticles(bx + 2.2, 4.0, bz, 0xff0055, 25);
-                playSfx('explode');
-                boss.cannonR.visible = false;
+              showDamageNumber(1, bx + 2.4, 1.0, bz);
+              if (boss.treadR_Hp <= 0) {
+                spawnExplosionSmoke(bx + 2.4, 1.0, bz, 20);
+                playSfx('explosion');
+                boss.speed *= 0.6;
               }
             }
-            // 本体コア
-            else if (Math.abs(b.mesh.position.x - bx) < 1.8 && Math.abs(b.mesh.position.z - bz) < 1.8) {
+            // 車体本体
+            else if (Math.abs(b.mesh.position.x - bx) < 2.2 && Math.abs(b.mesh.position.z - bz) < 2.8) {
               const isCrit = Math.random() < 0.25;
               const dmg = isCrit ? 3 : 1;
               boss.hp -= dmg;
               hit = true;
               chargeUlt(2.0);
-              showDamageNumber(dmg, bx, 2.8, bz, isCrit);
+              showDamageNumber(dmg, bx, 2.0, bz, isCrit);
               updateBossHp();
 
               if (boss.hp <= 0) {
-                spawnParticles(bx, 3.0, bz, 0xff0055, 80);
+                spawnExplosionSmoke(bx, 2.0, bz, 60);
                 shakeIntensity = 1.4;
-                playSfx('explode');
+                playSfx('explosion');
                 scene.remove(boss.mesh);
                 boss = null;
                 score += 800;
@@ -1298,25 +1462,25 @@
           }
         }
 
-        // --- 2. 敵の行動 & 弾幕 ---
+        // --- 2. 敵の行動 & 攻撃（実銃＆RPG） ---
         for (let i = enemies.length - 1; i >= 0; i--) {
           const e = enemies[i];
           e.mesh.position.z += e.speed;
 
-          if (e.type === 'drone') {
-            e.mesh.position.x += e.slideDir * 0.05;
-            if (Math.abs(e.mesh.position.x) > BRIDGE_WIDTH / 2 - 0.8) e.slideDir *= -1;
-          }
-
-          // 敵射撃
           e.shootCool -= delta;
           if (e.shootCool <= 0) {
             e.shootCool = 1.6 + Math.random() * 0.8;
-            playSfx('laser');
-            const eb = new THREE.Mesh(new THREE.SphereGeometry(0.24, 6, 6), new THREE.MeshBasicMaterial({ color: 0xff0055 }));
+            playSfx('rifle');
+
+            // 敵の弾（赤色曳光弾またはロケット弾）
+            const isRpg = e.type === 'rpg';
+            const eb = new THREE.Mesh(
+              new THREE.SphereGeometry(isRpg ? 0.32 : 0.2, 5, 5),
+              new THREE.MeshBasicMaterial({ color: isRpg ? 0xdc2626 : 0xf87171 })
+            );
             eb.position.set(e.mesh.position.x, 0.7, e.mesh.position.z + 0.6);
             scene.add(eb);
-            enemyBullets.push({ mesh: eb, vz: 0.32 });
+            enemyBullets.push({ mesh: eb, vz: isRpg ? 0.42 : 0.32, isRpg });
           }
 
           if (e.mesh.position.z >= DEFENSE_Z) {
@@ -1347,42 +1511,49 @@
           if (hitPlayer) {
             scene.remove(eb.mesh);
             enemyBullets.splice(i, 1);
-            removeSquad(1);
+            removeSquad(eb.isRpg ? 3 : 1);
             if (squadMembers.length <= 0) { endGame(false); return; }
           }
         }
 
-        // --- 3. ボス攻撃パターン ---
+        // --- 3. 重戦車ボスの主砲砲撃 ---
         if (boss) {
           boss.mesh.position.z += boss.speed;
-          boss.attackCool -= delta;
+          boss.cannonCool -= delta;
 
-          if (boss.attackCool <= 0) {
-            boss.attackCool = 4.2;
+          if (boss.cannonCool <= 0) {
+            boss.cannonCool = 3.5;
+            playSfx('explosion');
+            shakeIntensity = 0.7;
 
-            // キャノンが生きていればマイクロミサイル発射
-            if (boss.cannonL_Hp > 0 || boss.cannonR_Hp > 0) {
-              for (let k = 0; k < 3; k++) {
-                setTimeout(() => {
-                  if (!boss) return;
-                  const m = new THREE.Mesh(new THREE.SphereGeometry(0.3, 6, 6), new THREE.MeshBasicMaterial({ color: 0xff0044 }));
-                  m.position.set(boss.mesh.position.x + (Math.random() - 0.5) * 3, 3.5, boss.mesh.position.z + 1);
-                  scene.add(m);
-                  enemyBullets.push({ mesh: m, vz: 0.38 });
-                }, k * 200);
-              }
-            }
-
-            // 警告レーザー
-            const targetLaneX = (Math.floor(Math.random() * 3) - 1) * 2.8;
-            const warn = new THREE.Mesh(
-              new THREE.PlaneGeometry(2.6, 80),
-              new THREE.MeshBasicMaterial({ color: 0xff0055, transparent: true, opacity: 0.4 })
+            // 着弾地点（プレイヤーがいるXレーンへ砲撃榴弾）
+            const targetLaneX = playerLeaderX;
+            const shell = new THREE.Mesh(
+              new THREE.SphereGeometry(0.45, 6, 6),
+              new THREE.MeshLambertMaterial({ color: 0x1f2937 })
             );
-            warn.rotation.x = -Math.PI / 2;
-            warn.position.set(targetLaneX, 0.06, -10);
-            scene.add(warn);
-            laserWarnings.push({ mesh: warn, timer: 1.3, x: targetLaneX });
+            shell.position.set(boss.mesh.position.x, 2.3, boss.mesh.position.z + 2);
+            scene.add(shell);
+
+            // 弾道アニメーション
+            gsap.to(shell.position, {
+              x: targetLaneX,
+              y: 0.5,
+              z: DEFENSE_Z,
+              duration: 1.0,
+              ease: 'power1.in',
+              onComplete: () => {
+                scene.remove(shell);
+                playSfx('explosion');
+                shakeIntensity = 1.0;
+                spawnExplosionSmoke(targetLaneX, 0.5, DEFENSE_Z, 30);
+
+                if (Math.abs(playerLeaderX - targetLaneX) < 1.6) {
+                  removeSquad(5);
+                  if (squadMembers.length <= 0) { endGame(false); return; }
+                }
+              }
+            });
           }
 
           if (boss.mesh.position.z >= DEFENSE_Z - 1.5) {
@@ -1391,25 +1562,7 @@
           }
         }
 
-        // メガレーザー照射
-        for (let i = laserWarnings.length - 1; i >= 0; i--) {
-          const lw = laserWarnings[i];
-          lw.timer -= delta;
-          if (lw.timer <= 0) {
-            playSfx('orbital');
-            shakeIntensity = 1.0;
-            spawnParticles(lw.x, 0.8, DEFENSE_Z, 0xff0055, 30);
-
-            if (Math.abs(playerLeaderX - lw.x) < 1.6) {
-              removeSquad(8);
-              if (squadMembers.length <= 0) { endGame(false); return; }
-            }
-            scene.remove(lw.mesh);
-            laserWarnings.splice(i, 1);
-          }
-        }
-
-        // ゲート通過
+        // ゲート通過判定
         for (let i = gates.length - 1; i >= 0; i--) {
           const g = gates[i];
           g.mesh.position.z += 0.11;
@@ -1429,7 +1582,22 @@
           }
         }
 
-        // パーティクル
+        // 薬莢の物理挙動
+        for (let i = shellCasings.length - 1; i >= 0; i--) {
+          const sc = shellCasings[i];
+          sc.mesh.position.x += sc.vx;
+          sc.mesh.position.y += sc.vy;
+          sc.mesh.position.z += sc.vz;
+          sc.vy -= 0.015; // 重力
+          sc.mesh.rotation.x += 0.2;
+          sc.life -= delta;
+          if (sc.life <= 0) {
+            scene.remove(sc.mesh);
+            shellCasings.splice(i, 1);
+          }
+        }
+
+        // パーティクル更新
         for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
           p.mesh.position.x += p.vx;
@@ -1444,8 +1612,7 @@
         }
       }
 
-      // ポストプロセッシングBloomレンダリング
-      composer.render();
+      renderer.render(scene, camera);
     }
 
     // --- ゲームオーバー / クリア ---
@@ -1456,13 +1623,13 @@
       const desc = document.getElementById('result-desc');
 
       if (isClear) {
-        title.innerText = 'VICTORY ACHIEVED';
-        title.style.color = '#38bdf8';
-        desc.innerHTML = `タイタンオーバーロードを完全殲滅！<br>防衛ラインの死守に成功した！<br><br>生存部隊: <b>${squadMembers.length}人</b><br>最終スコア: <b>${score}</b>`;
+        title.innerText = 'MISSION ACCOMPLISHED';
+        title.style.color = '#22c55e';
+        desc.innerHTML = `敵重戦車大隊を完全壊滅！<br>沿岸ブリッジ防衛線の死守に成功した！<br><br>残存戦力: <b>${squadMembers.length}名</b><br>最終スコア: <b>${score}</b>`;
       } else {
         title.innerText = 'MISSION FAILED';
-        title.style.color = '#ff0055';
-        desc.innerHTML = `部隊が全滅し防衛線を突破された...<br><br>最終スコア: <b>${score}</b>`;
+        title.style.color = '#ef4444';
+        desc.innerHTML = `防衛部隊が全滅し防衛線を突破された...<br><br>最終スコア: <b>${score}</b>`;
       }
       res.style.display = 'flex';
     }
