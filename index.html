@@ -290,7 +290,7 @@
     <div id="start-screen" class="screen-overlay">
       <h1 class="screen-title">DEAD BRIDGE: TACTICAL</h1>
       <p id="start-subtext" class="screen-desc">
-        <b>【左右移動に全集中せよ】</b><br>
+        <b>【左右のエイム判断に全集中せよ】</b><br>
         射撃は自動フルオート！<br>
         疾走する<b>超高速ランナー</b>を正面で迎え撃ち、<br>
         青壁越しに射撃して<b>強化貫通弾</b>で奥の群れを薙ぎ払え！<br>
@@ -328,48 +328,54 @@
     let bgmTimer = 0;
 
     function initAudio() {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+      } catch (e) {}
     }
 
+    // 【修正】kGain.gain.linearRampToValueAtTime に修正し、全体をtry-catchで安全保護
     function stepBgm() {
       if (!audioCtx || !isPlaying) return;
-      const now = audioCtx.currentTime;
+      try {
+        const now = audioCtx.currentTime;
 
-      const bufferSize = audioCtx.sampleRate * 0.05;
-      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const bufferSize = audioCtx.sampleRate * 0.05;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
 
-      const noise = audioCtx.createBufferSource();
-      noise.buffer = buffer;
-      const filter = audioCtx.createBiquadFilter();
-      filter.type = 'highpass';
-      filter.frequency.setValueAtTime(1400, now);
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.setValueAtTime(1400, now);
 
-      const gain = audioCtx.createGain();
-      const isStrong = (bgmStep % 4 === 0) || (bgmStep % 4 === 2);
-      gain.gain.setValueAtTime(isStrong ? 0.08 : 0.03, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        const gain = audioCtx.createGain();
+        const isStrong = (bgmStep % 4 === 0) || (bgmStep % 4 === 2);
+        gain.gain.setValueAtTime(isStrong ? 0.08 : 0.03, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
 
-      noise.connect(filter);
-      filter.connect(gain);
-      gain.connect(audioCtx.destination);
-      noise.start(now);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        noise.start(now);
 
-      if (bgmStep % 4 === 0) {
-        const kOsc = audioCtx.createOscillator();
-        const kGain = audioCtx.createGain();
-        kOsc.frequency.setValueAtTime(120, now);
-        kOsc.frequency.exponentialRampToValueAtTime(30, now + 0.1);
-        kGain.gain.setValueAtTime(0.14, now);
-        kGain.linearRampToValueAtTime(0.001, now + 0.1);
-        kOsc.connect(kGain);
-        kGain.connect(audioCtx.destination);
-        kOsc.start(now);
-        kOsc.stop(now + 0.1);
-      }
-      bgmStep++;
+        // バスドラム（修正箇所：kGain.gain）
+        if (bgmStep % 4 === 0) {
+          const kOsc = audioCtx.createOscillator();
+          const kGain = audioCtx.createGain();
+          kOsc.frequency.setValueAtTime(120, now);
+          kOsc.frequency.exponentialRampToValueAtTime(30, now + 0.1);
+          kGain.gain.setValueAtTime(0.14, now);
+          kGain.gain.linearRampToValueAtTime(0.001, now + 0.1); // ← 正確に修正！
+          kOsc.connect(kGain);
+          kGain.connect(audioCtx.destination);
+          kOsc.start(now);
+          kOsc.stop(now + 0.1);
+        }
+        bgmStep++;
+      } catch (e) {}
     }
 
     function playSfx(type) {
@@ -447,7 +453,7 @@
     // --- ゲーム設定 ---
     const BRIDGE_WIDTH = 9.6;
     const DEFENSE_Z = 13.0;
-    const MAX_SQUAD = 15; // 画面を制圧しすぎない適正上限
+    const MAX_SQUAD = 15;
     let isPlaying = false;
     let score = 0;
     let gameTime = 0;
@@ -478,7 +484,7 @@
     let soldierAnimations = [];
     let hasLoadedAsset = false;
 
-    // --- テクスチャ生成 ---
+    // --- 高精細テクスチャ生成 ---
     function createRoadTexture() {
       const cvs = document.createElement('canvas');
       cvs.width = 1024; cvs.height = 1024;
@@ -580,7 +586,7 @@
       return new THREE.CanvasTexture(cvs);
     }
 
-    // --- 装備 ---
+    // --- 特殊部隊装備（ライフル ＆ 4眼暗視ゴーグル） ---
     function createSpecialForcesRifle() {
       const gun = new THREE.Group();
       const gunMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.3, metalness: 0.85 });
@@ -680,11 +686,11 @@
       model.scale.set(scale, scale, scale);
 
       const mixer = new THREE.AnimationMixer(model);
-      let clip = soldierAnimations[3] || soldierAnimations[0]; // Walk
+      let clip = soldierAnimations[3] || soldierAnimations[0];
       let animSpeed = 1.0;
 
       if (type === 'runner') {
-        clip = soldierAnimations[1]; // Run（猛ダッシュ）
+        clip = soldierAnimations[1]; // Run
         animSpeed = 1.9;
       }
       const action = mixer.clipAction(clip);
@@ -698,8 +704,8 @@
           child.receiveShadow = true;
           child.material = child.material.clone();
 
-          if (type === 'runner') child.material.color.setHex(0x991b1b); // 血染め赤
-          else if (type === 'tank') child.material.color.setHex(0x18181b); // 黒変異
+          if (type === 'runner') child.material.color.setHex(0x991b1b);
+          else if (type === 'tank') child.material.color.setHex(0x18181b);
           else child.material.color.setHex(0x3f5545);
 
           child.material.roughness = 0.9;
@@ -747,7 +753,7 @@
       return { model, mixer, bones, mats, core };
     }
 
-    // --- 初期化 ---
+    // --- 初期セットアップ ---
     let tracerTextureNormal = null;
     let tracerTextureAmp = null;
 
@@ -918,11 +924,10 @@
       document.getElementById('squad-val').innerText = squadMembers.length;
       squadMembers.forEach((m, idx) => {
         if (idx === 0) { m.offsetX = 0; m.offsetZ = 0; return; }
-        // 縦深型V字（デルタ）隊形：横に広がらずプレイヤーのX座標周りに集中！
         const row = Math.floor((idx + 1) / 2);
         const side = idx % 2 === 1 ? -1 : 1;
-        m.offsetX = side * (row * 0.32); // 横幅を極めてコンパクトに
-        m.offsetZ = row * 0.75;          // 縦に並ぶ
+        m.offsetX = side * (row * 0.32);
+        m.offsetZ = row * 0.75;
       });
     }
 
@@ -1269,7 +1274,7 @@
           }
         });
 
-        // --- 完全自動フルオート射撃（プレイヤーは左右移動だけに集中！） ---
+        // 完全自動フルオート射撃
         shootCool -= delta;
         if (shootCool <= 0) {
           shootCool = 0.12;
@@ -1323,15 +1328,13 @@
           gateTimer = 8.0;
         }
 
-        // --- ゾンビ大群スポーン（左右判断を迫る戦術ウェーブ設計） ---
+        // ゾンビ大群スポーン（左右判断を迫る戦術ウェーブ設計）
         spawnTimer -= delta;
         if (spawnTimer <= 0 && !boss) {
-          // パターン1: 片側レーンに超高速ランナーの急襲！
-          // パターン2: 片側レーンに重装甲タンクの肉壁！
           const pattern = Math.random();
 
           if (pattern < 0.45) {
-            // 【高速ランナー強襲ウェーブ】特定のレーン（左か右）にランナー3体が縦一列で猛ダッシュ！
+            // 【高速ランナー強襲ウェーブ】特定のレーンにランナー3体が縦一列で猛ダッシュ！
             const laneSide = Math.random() < 0.5 ? -1 : 1;
             const laneX = laneSide * 2.8;
 
@@ -1346,7 +1349,7 @@
                 mats: zObj.mats,
                 hp: 2,
                 type: 'runner',
-                speed: 0.28, // 超猛ダッシュ！
+                speed: 0.28,
                 wobbleSeed: Math.random() * 10
               });
             }
@@ -1378,7 +1381,6 @@
             }
           }
 
-          // 時間経過とともにスポーン加速
           spawnTimer = Math.max(0.4, 1.05 - gameTime * 0.015);
         }
 
@@ -1431,8 +1433,8 @@
                       g.val++;
                       updateGateTexture(g);
                     }
-                    b.damage = 2; // 青壁で威力倍増！
-                    b.penetration = 3; // 3体貫通！
+                    b.damage = 2; // 青壁で威力倍増
+                    b.penetration = 3; // 3体貫通
                     b.mesh.material.map = tracerTextureAmp;
                   }
                 }
@@ -1518,7 +1520,7 @@
           }
         }
 
-        // --- 2. ゾンビの移動＆即死防衛ライン ---
+        // --- 2. ゾンビの移動＆防衛ライン判定 ---
         for (let i = zombies.length - 1; i >= 0; i--) {
           const z = zombies[i];
           z.mesh.position.z += z.speed;
@@ -1530,7 +1532,6 @@
             scene.remove(z.mesh);
             zombies.splice(i, 1);
 
-            // タンクは2人、通常は1人倒される
             removeSquad(z.type === 'tank' ? 2 : 1);
             if (!isPlaying) return;
           }
