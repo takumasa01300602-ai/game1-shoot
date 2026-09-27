@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Bridge Defense 3D</title>
+  <title>Squad Rush Defense 3D</title>
   <style>
     * {
       box-sizing: border-box;
@@ -18,7 +18,7 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background-color: #0b0f19;
+      background-color: #030712;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       touch-action: none;
     }
@@ -33,6 +33,7 @@
       width: 100%;
       height: 100%;
     }
+
     /* UIレイヤー */
     .hud {
       position: absolute;
@@ -46,28 +47,40 @@
       z-index: 10;
     }
     .badge {
-      background: rgba(15, 23, 42, 0.75);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(8px);
-      padding: 8px 14px;
-      border-radius: 20px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      backdrop-filter: blur(10px);
+      padding: 8px 16px;
+      border-radius: 24px;
       color: #fff;
-      font-size: 13px;
-      font-weight: 700;
+      font-size: 14px;
+      font-weight: 800;
       letter-spacing: 0.5px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    #level-badge { color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); }
-    #score-badge { color: #facc15; }
-    
+    #squad-badge {
+      color: #38bdf8;
+      border-color: #0284c7;
+      font-size: 16px;
+    }
+    #squad-count {
+      font-size: 20px;
+      color: #67e8f9;
+      font-weight: 900;
+    }
+    #score-badge { color: #facc15; border-color: rgba(250, 204, 21, 0.4); }
+
     /* ボスHPバー */
     #boss-hud {
       position: absolute;
-      top: calc(env(safe-area-inset-top, 16px) + 52px);
+      top: calc(env(safe-area-inset-top, 16px) + 54px);
       left: 50%;
       transform: translateX(-50%);
-      width: 75%;
-      max-width: 320px;
+      width: 80%;
+      max-width: 340px;
       display: none;
       flex-direction: column;
       align-items: center;
@@ -75,34 +88,40 @@
       pointer-events: none;
     }
     #boss-name {
-      color: #ef4444;
-      font-size: 12px;
+      color: #f87171;
+      font-size: 13px;
       font-weight: 900;
-      letter-spacing: 1px;
-      margin-bottom: 4px;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+      letter-spacing: 1.5px;
+      margin-bottom: 5px;
+      text-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+      animation: pulse 1s infinite alternate;
+    }
+    @keyframes pulse {
+      from { opacity: 0.8; }
+      to { opacity: 1; transform: scale(1.05); }
     }
     .boss-bar-bg {
       width: 100%;
-      height: 10px;
-      background: rgba(0,0,0,0.6);
-      border: 1.5px solid #ef4444;
-      border-radius: 6px;
+      height: 12px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #ef4444;
+      border-radius: 8px;
       overflow: hidden;
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
     }
     #boss-bar-fill {
       width: 100%;
       height: 100%;
-      background: linear-gradient(90deg, #f87171, #ef4444);
+      background: linear-gradient(90deg, #f87171, #dc2626);
       transition: width 0.1s linear;
     }
 
-    /* モーダル画面（スタート/リトライ） */
+    /* 画面オーバーレイ */
     .overlay-screen {
       position: absolute;
       inset: 0;
-      background: rgba(11, 15, 25, 0.85);
-      backdrop-filter: blur(10px);
+      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.85) 0%, rgba(3, 7, 18, 0.95) 100%);
+      backdrop-filter: blur(12px);
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -112,33 +131,35 @@
       text-align: center;
     }
     .screen-title {
-      font-size: 32px;
+      font-size: 34px;
       font-weight: 900;
-      margin-bottom: 12px;
       letter-spacing: 1px;
+      margin-bottom: 12px;
+      text-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
     }
     .screen-desc {
       font-size: 14px;
       color: #94a3b8;
-      max-width: 280px;
-      line-height: 1.6;
-      margin-bottom: 28px;
+      max-width: 300px;
+      line-height: 1.7;
+      margin-bottom: 32px;
     }
     .btn-main {
-      padding: 16px 40px;
+      padding: 16px 44px;
       font-size: 18px;
-      font-weight: 800;
+      font-weight: 900;
       border: none;
-      border-radius: 30px;
+      border-radius: 36px;
       background: linear-gradient(135deg, #0284c7, #38bdf8);
       color: #fff;
-      box-shadow: 0 8px 24px rgba(56, 189, 248, 0.4);
+      box-shadow: 0 10px 30px rgba(56, 189, 248, 0.5);
       cursor: pointer;
       outline: none;
-      letter-spacing: 0.5px;
+      letter-spacing: 1px;
+      transition: transform 0.1s;
     }
     .btn-main:active {
-      transform: scale(0.96);
+      transform: scale(0.95);
     }
     #error-log {
       position: absolute;
@@ -147,15 +168,14 @@
       right: 10px;
       color: #f87171;
       font-size: 11px;
-      background: rgba(0,0,0,0.8);
-      padding: 6px;
-      border-radius: 4px;
+      background: rgba(0,0,0,0.85);
+      padding: 8px;
+      border-radius: 6px;
       display: none;
       z-index: 100;
       word-break: break-all;
     }
   </style>
-  <!-- Three.js (最も互換性が高く安定した r128 CDN) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
@@ -163,12 +183,15 @@
     <div id="error-log"></div>
 
     <div class="hud">
-      <div id="level-badge" class="badge">WEAPON: Lv.1</div>
+      <div id="squad-badge" class="badge">
+        <span>SQUAD:</span>
+        <span id="squad-count">1</span>
+      </div>
       <div id="score-badge" class="badge">SCORE: 0</div>
     </div>
 
     <div id="boss-hud">
-      <div id="boss-name">⚠ WARNING: TITAN BOSS ⚠</div>
+      <div id="boss-name">⚠ EMERGENCY: TITAN MECH ⚠</div>
       <div class="boss-bar-bg">
         <div id="boss-bar-fill"></div>
       </div>
@@ -176,42 +199,38 @@
 
     <!-- スタート画面 -->
     <div id="start-screen" class="overlay-screen">
-      <h1 class="screen-title" style="color: #38bdf8;">BRIDGE DEFENSE</h1>
+      <h1 class="screen-title" style="color: #38bdf8;">SQUAD RUSH 3D</h1>
       <p class="screen-desc">
-        画面を指でドラッグして左右に移動！<br>
-        青いゲートで弾を増やし、迫り来る敵とボスを迎撃せよ。
+        指でドラッグして左右移動！<br>
+        青いゲート（+5, ×2）を通って<b>仲間を大増殖</b>させ、大軍団の一斉射撃で敵と巨大ボスを殲滅せよ！
       </p>
       <button id="start-btn" class="btn-main">TAP TO START</button>
     </div>
 
-    <!-- 結果画面 -->
+    <!-- リザルト画面 -->
     <div id="result-screen" class="overlay-screen" style="display: none;">
-      <h1 id="result-title" class="screen-title">GAME OVER</h1>
+      <h1 id="result-title" class="screen-title">MISSION COMPLETE</h1>
       <p id="result-desc" class="screen-desc"></p>
-      <button id="retry-btn" class="btn-main">RETRY</button>
+      <button id="retry-btn" class="btn-main">PLAY AGAIN</button>
     </div>
   </div>
 
   <script>
-    // エラーハンドラー
+    // エラーキャッチャー
     window.onerror = function(msg, url, line) {
       const errBox = document.getElementById('error-log');
       errBox.style.display = 'block';
-      errBox.innerText = `エラー検知 (${line}行目): ${msg}`;
+      errBox.innerText = `Error (${line}行): ${msg}`;
     };
 
-    // --- Web Audio 簡易シンセ（完全自律サウンド） ---
+    // --- Web Audio サウンドシンセ ---
     let audioCtx = null;
     function initAudio() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
     }
 
-    function playSound(type) {
+    function playSfx(type) {
       if (!audioCtx) return;
       try {
         const now = audioCtx.currentTime;
@@ -221,275 +240,349 @@
         gain.connect(audioCtx.destination);
 
         if (type === 'shoot') {
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(480, now);
-          osc.frequency.exponentialRampToValueAtTime(120, now + 0.08);
-          gain.gain.setValueAtTime(0.12, now);
-          gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
-          osc.start(now);
-          osc.stop(now + 0.08);
-        } else if (type === 'plasma') {
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(180, now);
-          osc.frequency.exponentialRampToValueAtTime(60, now + 0.2);
-          gain.gain.setValueAtTime(0.2, now);
-          gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
-          osc.start(now);
-          osc.stop(now + 0.2);
-        } else if (type === 'hit') {
           osc.type = 'square';
-          osc.frequency.setValueAtTime(200, now);
-          osc.frequency.linearRampToValueAtTime(80, now + 0.06);
+          osc.frequency.setValueAtTime(320 + Math.random() * 40, now);
+          osc.frequency.exponentialRampToValueAtTime(80, now + 0.05);
+          gain.gain.setValueAtTime(0.04, now);
+          gain.gain.linearRampToValueAtTime(0.001, now + 0.05);
+          osc.start(now);
+          osc.stop(now + 0.05);
+        } else if (type === 'gate_boost') {
+          // ファンファーレ和音
+          [523.25, 659.25, 783.99].forEach((freq, idx) => {
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.connect(g);
+            g.connect(audioCtx.destination);
+            o.type = 'triangle';
+            o.frequency.setValueAtTime(freq, now + idx * 0.04);
+            g.gain.setValueAtTime(0.12, now + idx * 0.04);
+            g.gain.linearRampToValueAtTime(0.001, now + 0.25);
+            o.start(now + idx * 0.04);
+            o.stop(now + 0.25);
+          });
+        } else if (type === 'gate_penalty') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.exponentialRampToValueAtTime(70, now + 0.18);
           gain.gain.setValueAtTime(0.15, now);
-          gain.gain.linearRampToValueAtTime(0.01, now + 0.06);
+          gain.gain.linearRampToValueAtTime(0.001, now + 0.18);
           osc.start(now);
-          osc.stop(now + 0.06);
-        } else if (type === 'gate') {
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(520, now);
-          osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
-          gain.gain.setValueAtTime(0.18, now);
-          gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+          osc.stop(now + 0.18);
+        } else if (type === 'explode') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(140, now);
+          osc.frequency.exponentialRampToValueAtTime(30, now + 0.15);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.linearRampToValueAtTime(0.001, now + 0.15);
           osc.start(now);
-          osc.stop(now + 0.12);
-        } else if (type === 'powerup') {
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(350, now);
-          osc.frequency.setValueAtTime(520, now + 0.08);
-          osc.frequency.setValueAtTime(780, now + 0.16);
-          gain.gain.setValueAtTime(0.25, now);
-          gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
-          osc.start(now);
-          osc.stop(now + 0.25);
+          osc.stop(now + 0.15);
         }
       } catch (e) {}
     }
 
-    // --- ゲーム設定・状態 ---
+    // --- 定数 & 状態 ---
     const BRIDGE_WIDTH = 9.0;
-    const DEFENSE_Z = 12.0;
+    const DEFENSE_Z = 13.0;
     let isPlaying = false;
     let score = 0;
-    let weaponLevel = 1;
-    let spawnTimer = 0;
     let gameTime = 0;
+    let spawnTimer = 0;
+    let gateTimer = 0;
     let bossSpawned = false;
+    let shakeIntensity = 0;
 
-    // Three.js 変数
+    // Three.js
     let scene, camera, renderer;
-    let playerGroup;
-    let playerTargetX = 0;
+    let playerLeaderX = 0;
+    let targetLeaderX = 0;
+    let cyberFloor;
+
+    // ゲームオブジェクト
+    let squadMembers = []; // { mesh, offsetX, offsetZ, legL, legR, gun }
     let bullets = [];
     let enemies = [];
     let gates = [];
-    let items = [];
     let particles = [];
     let boss = null;
 
-    // --- Canvas テクスチャ生成（ゲート文字） ---
+    // --- テクスチャ生成 ---
+    function createCyberGridTexture() {
+      const cvs = document.createElement('canvas');
+      cvs.width = 512;
+      cvs.height = 512;
+      const ctx = cvs.getContext('2d');
+      ctx.fillStyle = '#060a17';
+      ctx.fillRect(0, 0, 512, 512);
+
+      // グリッド線
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+      ctx.lineWidth = 3;
+      for (let i = 0; i <= 512; i += 64) {
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(512, i); ctx.stroke();
+      }
+      return new THREE.CanvasTexture(cvs);
+    }
+
     function createGateTexture(text, isPositive) {
       const cvs = document.createElement('canvas');
       cvs.width = 256;
       cvs.height = 256;
       const ctx = cvs.getContext('2d');
 
-      ctx.fillStyle = isPositive ? 'rgba(14, 165, 233, 0.4)' : 'rgba(239, 68, 68, 0.4)';
+      ctx.fillStyle = isPositive ? 'rgba(2, 132, 199, 0.55)' : 'rgba(220, 38, 38, 0.55)';
       ctx.fillRect(0, 0, 256, 256);
 
+      // 枠線
       ctx.strokeStyle = isPositive ? '#38bdf8' : '#f87171';
-      ctx.lineWidth = 12;
-      ctx.strokeRect(6, 6, 244, 244);
+      ctx.lineWidth = 14;
+      ctx.strokeRect(7, 7, 242, 242);
 
+      // グロー文字
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 74px Arial, sans-serif';
+      ctx.font = '900 80px -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.shadowColor = isPositive ? '#0284c7' : '#b91c1c';
-      ctx.shadowBlur = 16;
+      ctx.shadowColor = isPositive ? '#0284c7' : '#991b1b';
+      ctx.shadowBlur = 20;
       ctx.fillText(text, 128, 128);
 
       return new THREE.CanvasTexture(cvs);
     }
 
-    // --- 3Dモデル構築（トイ・ローポリ風） ---
-    function createPlayerMesh() {
+    // --- 3Dモデル生成 ---
+    // トイ風ミニオン（味方兵士）
+    function createSoldierMesh(isLeader = false) {
       const group = new THREE.Group();
-      // 体
-      const bodyGeo = new THREE.BoxGeometry(0.8, 0.9, 0.6);
-      const bodyMat = new THREE.MeshLambertMaterial({ color: 0x0284c7 });
+
+      // ボディ（ブロック）
+      const bodyGeo = new THREE.BoxGeometry(0.5, 0.6, 0.35);
+      const bodyMat = new THREE.MeshLambertMaterial({ color: isLeader ? 0x0284c7 : 0x0ea5e9 });
       const body = new THREE.Mesh(bodyGeo, bodyMat);
-      body.position.y = 0.65;
+      body.position.y = 0.5;
       group.add(body);
-      // 頭
-      const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-      const headMat = new THREE.MeshLambertMaterial({ color: 0xfde047 });
+
+      // 頭（ブロック）
+      const headGeo = new THREE.BoxGeometry(0.38, 0.38, 0.38);
+      const headMat = new THREE.MeshLambertMaterial({ color: 0xfacc15 });
       const head = new THREE.Mesh(headGeo, headMat);
-      head.position.y = 1.35;
+      head.position.y = 1.0;
       group.add(head);
-      // 銃身
-      const gunGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.8, 8);
+
+      // バイザー（青く光るゴーグル）
+      const visorGeo = new THREE.BoxGeometry(0.32, 0.12, 0.08);
+      const visorMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+      const visor = new THREE.Mesh(visorGeo, visorMat);
+      visor.position.set(0, 1.02, -0.18);
+      group.add(visor);
+
+      // 足（左・右）
+      const legGeo = new THREE.BoxGeometry(0.16, 0.3, 0.2);
+      const legMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+      const legL = new THREE.Mesh(legGeo, legMat);
+      legL.position.set(-0.14, 0.15, 0);
+      const legR = new THREE.Mesh(legGeo, legMat);
+      legR.position.set(0.14, 0.15, 0);
+      group.add(legL, legR);
+
+      // 銃
+      const gunGeo = new THREE.BoxGeometry(0.12, 0.14, 0.45);
       const gunMat = new THREE.MeshLambertMaterial({ color: 0x334155 });
       const gun = new THREE.Mesh(gunGeo, gunMat);
-      gun.rotation.x = Math.PI / 2;
-      gun.position.set(0.45, 0.7, -0.4);
+      gun.position.set(0.28, 0.55, -0.25);
       group.add(gun);
 
-      return group;
+      return { group, legL, legR, gun };
     }
 
+    // 敵兵士
     function createEnemyMesh(type) {
       const group = new THREE.Group();
       let color = 0xef4444; // 通常：赤
       let scale = 1.0;
 
-      if (type === 'fast') {
-        color = 0xa855f7; // 高速：紫
-        scale = 0.75;
-      } else if (type === 'heavy') {
-        color = 0xeab308; // 重装：黄
-        scale = 1.35;
-      }
+      if (type === 'fast') { color = 0xa855f7; scale = 0.75; } // 高速：紫
+      if (type === 'heavy') { color = 0xf59e0b; scale = 1.4; } // 重装：オレンジ
 
-      const bodyGeo = new THREE.BoxGeometry(0.7 * scale, 0.8 * scale, 0.5 * scale);
+      const bodyGeo = new THREE.BoxGeometry(0.5 * scale, 0.6 * scale, 0.35 * scale);
       const bodyMat = new THREE.MeshLambertMaterial({ color });
       const body = new THREE.Mesh(bodyGeo, bodyMat);
-      body.position.y = (0.8 * scale) / 2 + 0.2;
+      body.position.y = 0.5 * scale;
       group.add(body);
 
-      const headGeo = new THREE.BoxGeometry(0.45 * scale, 0.45 * scale, 0.45 * scale);
-      const headMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+      const headGeo = new THREE.BoxGeometry(0.38 * scale, 0.38 * scale, 0.38 * scale);
+      const headMat = new THREE.MeshLambertMaterial({ color: 0x0f172a });
       const head = new THREE.Mesh(headGeo, headMat);
-      head.position.y = body.position.y + (0.65 * scale);
+      head.position.y = 1.0 * scale;
       group.add(head);
 
+      // 赤いモノアイ
+      const eyeGeo = new THREE.BoxGeometry(0.25 * scale, 0.1 * scale, 0.08 * scale);
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
+      const eye = new THREE.Mesh(eyeGeo, eyeMat);
+      eye.position.set(0, 1.02 * scale, 0.18 * scale);
+      group.add(eye);
+
+      // 重装兵のアーマー
       if (type === 'heavy') {
-        // シールド
-        const shieldGeo = new THREE.BoxGeometry(1.2, 1.2, 0.15);
-        const shieldMat = new THREE.MeshLambertMaterial({ color: 0x64748b });
-        const shield = new THREE.Mesh(shieldGeo, shieldMat);
-        shield.position.set(0, 0.8, 0.35);
-        group.add(shield);
+        const armorGeo = new THREE.BoxGeometry(0.85, 0.85, 0.15);
+        const armorMat = new THREE.MeshLambertMaterial({ color: 0x475569 });
+        const armor = new THREE.Mesh(armorGeo, armorMat);
+        armor.position.set(0, 0.65, 0.25);
+        group.add(armor);
       }
 
       return group;
     }
 
+    // 巨大タイタンボス
     function createBossMesh() {
       const group = new THREE.Group();
-      // 巨大ボディ
-      const bodyGeo = new THREE.BoxGeometry(2.4, 3.0, 1.8);
+
+      // 胴体メカ
+      const bodyGeo = new THREE.BoxGeometry(2.6, 2.8, 1.8);
       const bodyMat = new THREE.MeshLambertMaterial({ color: 0x991b1b });
       const body = new THREE.Mesh(bodyGeo, bodyMat);
-      body.position.y = 2.0;
+      body.position.y = 2.4;
       group.add(body);
-      // 頭
-      const headGeo = new THREE.BoxGeometry(1.5, 1.4, 1.4);
-      const headMat = new THREE.MeshLambertMaterial({ color: 0x0f172a });
+
+      // コア（胸で赤く点滅）
+      const coreGeo = new THREE.BoxGeometry(1.0, 1.0, 0.2);
+      const coreMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
+      const core = new THREE.Mesh(coreGeo, coreMat);
+      core.position.set(0, 2.4, 0.95);
+      group.add(core);
+
+      // 頭部
+      const headGeo = new THREE.BoxGeometry(1.4, 1.2, 1.2);
+      const headMat = new THREE.MeshLambertMaterial({ color: 0x111827 });
       const head = new THREE.Mesh(headGeo, headMat);
-      head.position.y = 4.2;
+      head.position.y = 4.3;
       group.add(head);
-      // 角/トゲ
-      const hornGeo = new THREE.ConeGeometry(0.3, 0.8, 4);
-      const hornMat = new THREE.MeshLambertMaterial({ color: 0xf59e0b });
-      const hornL = new THREE.Mesh(hornGeo, hornMat);
-      hornL.position.set(-0.6, 5.0, 0);
-      const hornR = hornL.clone();
-      hornR.position.x = 0.6;
-      group.add(hornL, hornR);
+
+      // バイザー
+      const visorGeo = new THREE.BoxGeometry(1.0, 0.3, 0.1);
+      const visorMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+      const visor = new THREE.Mesh(visorGeo, visorMat);
+      visor.position.set(0, 4.3, 0.62);
+      group.add(visor);
+
+      // 両肩のキャノンポッド
+      const podGeo = new THREE.BoxGeometry(0.9, 1.1, 2.0);
+      const podMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+      const podL = new THREE.Mesh(podGeo, podMat);
+      podL.position.set(-1.8, 3.4, 0);
+      const podR = podL.clone();
+      podR.position.x = 1.8;
+      group.add(podL, podR);
 
       return group;
     }
 
-    // --- 初期化 ---
+    // --- 初期セットアップ ---
     function init() {
       const container = document.getElementById('game-container');
-      const width = container.clientWidth;
-      const height = container.clientHeight;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
 
       // シーン
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x070b14);
-      scene.fog = new THREE.Fog(0x070b14, 35, 95);
+      scene.background = new THREE.Color(0x030712);
+      scene.fog = new THREE.FogExp2(0x030712, 0.015);
 
-      // カメラ
-      camera = new THREE.PerspectiveCamera(52, width / height, 0.1, 150);
-      camera.position.set(0, 14, 21);
-      camera.lookAt(0, 0, -2);
+      // カメラ（迫力の見下ろしクォータービュー）
+      camera = new THREE.PerspectiveCamera(54, w / h, 0.1, 200);
+      camera.position.set(0, 15, 23);
+      camera.lookAt(0, 1, 0);
 
       // レンダラー
-      renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(width, height);
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setSize(w, h);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       container.appendChild(renderer.domElement);
 
-      // ライト
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
-      scene.add(ambientLight);
+      // ライティング
+      const hemiLight = new THREE.HemisphereLight(0x38bdf8, 0x0f172a, 0.7);
+      scene.add(hemiLight);
 
-      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-      dirLight.position.set(10, 20, 15);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+      dirLight.position.set(12, 25, 15);
       scene.add(dirLight);
 
-      // 橋（ステージ）
-      const bridgeGeo = new THREE.BoxGeometry(BRIDGE_WIDTH, 0.5, 110);
-      const bridgeMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+      // 遠景サイバーフロア（下を流れる無限グリッド）
+      const floorTex = createCyberGridTexture();
+      floorTex.wrapS = THREE.RepeatWrapping;
+      floorTex.wrapT = THREE.RepeatWrapping;
+      floorTex.repeat.set(16, 32);
+      const floorGeo = new THREE.PlaneGeometry(160, 240);
+      const floorMat = new THREE.MeshBasicMaterial({ map: floorTex });
+      cyberFloor = new THREE.Mesh(floorGeo, floorMat);
+      cyberFloor.rotation.x = -Math.PI / 2;
+      cyberFloor.position.set(0, -6, -30);
+      scene.add(cyberFloor);
+
+      // 橋（ステージプラットフォーム）
+      const bridgeGeo = new THREE.BoxGeometry(BRIDGE_WIDTH, 0.6, 120);
+      const bridgeMat = new THREE.MeshLambertMaterial({ color: 0x0f172a });
       const bridge = new THREE.Mesh(bridgeGeo, bridgeMat);
-      bridge.position.set(0, -0.25, -35);
+      bridge.position.set(0, -0.3, -35);
       scene.add(bridge);
 
-      // ガードレール
-      const railGeo = new THREE.BoxGeometry(0.3, 0.6, 110);
-      const railMat = new THREE.MeshLambertMaterial({ color: 0x0284c7 });
+      // ネオンサイドレール
+      const railGeo = new THREE.BoxGeometry(0.35, 0.5, 120);
+      const railMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
       const railL = new THREE.Mesh(railGeo, railMat);
-      railL.position.set(-BRIDGE_WIDTH / 2, 0.3, -35);
+      railL.position.set(-BRIDGE_WIDTH / 2, 0.25, -35);
       const railR = railL.clone();
       railR.position.x = BRIDGE_WIDTH / 2;
       scene.add(railL, railR);
 
-      // プレイヤー
-      playerGroup = createPlayerMesh();
-      playerGroup.position.set(0, 0, DEFENSE_Z);
-      scene.add(playerGroup);
+      // 防衛ライン（自陣手前の赤いネオン警戒線）
+      const lineGeo = new THREE.BoxGeometry(BRIDGE_WIDTH, 0.05, 0.3);
+      const lineMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+      const defLine = new THREE.Mesh(lineGeo, lineMat);
+      defLine.position.set(0, 0.05, DEFENSE_Z + 1.2);
+      scene.add(defLine);
 
-      // 操作リスナー
-      setupInput();
+      // 入力イベント
+      setupTouchInput();
 
-      // リサイズ対応
-      window.addEventListener('resize', onWindowResize);
-
-      // メインループ起動
+      window.addEventListener('resize', onResize);
       animate();
     }
 
-    function setupInput() {
+    // --- タッチ & ドラッグ操作 ---
+    function setupTouchInput() {
       let isDragging = false;
       let startClientX = 0;
       let startPlayerX = 0;
 
-      const onStart = (clientX) => {
+      const handleStart = (clientX) => {
         isDragging = true;
         startClientX = clientX;
-        startPlayerX = playerGroup.position.x;
+        startPlayerX = targetLeaderX;
       };
 
-      const onMove = (clientX) => {
+      const handleMove = (clientX) => {
         if (!isDragging || !isPlaying) return;
-        const deltaX = (clientX - startClientX) * 0.022;
-        playerTargetX = Math.max(-BRIDGE_WIDTH / 2 + 0.6, Math.min(BRIDGE_WIDTH / 2 - 0.6, startPlayerX + deltaX));
+        const deltaX = (clientX - startClientX) * 0.024;
+        const maxRange = BRIDGE_WIDTH / 2 - 0.7;
+        targetLeaderX = Math.max(-maxRange, Math.min(maxRange, startPlayerX + deltaX));
       };
 
-      const onEnd = () => { isDragging = false; };
+      const handleEnd = () => { isDragging = false; };
 
-      window.addEventListener('touchstart', (e) => onStart(e.touches[0].clientX), { passive: true });
-      window.addEventListener('touchmove', (e) => onMove(e.touches[0].clientX), { passive: true });
-      window.addEventListener('touchend', onEnd);
+      window.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientX), { passive: true });
+      window.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientX), { passive: true });
+      window.addEventListener('touchend', handleEnd);
 
-      window.addEventListener('mousedown', (e) => onStart(e.clientX));
-      window.addEventListener('mousemove', (e) => onMove(e.clientX));
-      window.addEventListener('mouseup', onEnd);
+      window.addEventListener('mousedown', (e) => handleStart(e.clientX));
+      window.addEventListener('mousemove', (e) => handleMove(e.clientX));
+      window.addEventListener('mouseup', handleEnd);
     }
 
-    function onWindowResize() {
+    function onResize() {
       const container = document.getElementById('game-container');
       const w = container.clientWidth;
       const h = container.clientHeight;
@@ -498,394 +591,464 @@
       renderer.setSize(w, h);
     }
 
-    // --- ゲームの開始・リセット ---
-    function startGame() {
-      initAudio();
-      document.getElementById('start-screen').style.display = 'none';
-      document.getElementById('result-screen').style.display = 'none';
+    // --- 部隊（Squad）の管理 ---
+    function updateSquadFormation() {
+      const count = squadMembers.length;
+      document.getElementById('squad-count').innerText = count;
 
-      // 既存オブジェクトのクリーンアップ
-      bullets.forEach(b => scene.remove(b.mesh));
-      enemies.forEach(e => scene.remove(e.mesh));
-      gates.forEach(g => scene.remove(g.mesh));
-      items.forEach(i => scene.remove(i.mesh));
-      particles.forEach(p => scene.remove(p.mesh));
-      if (boss) scene.remove(boss.mesh);
+      // 隊列配置（リーダーを中心に密集する三角形・扇形フォーメーション）
+      squadMembers.forEach((member, index) => {
+        if (index === 0) {
+          member.offsetX = 0;
+          member.offsetZ = 0;
+          return;
+        }
 
-      bullets = [];
-      enemies = [];
-      gates = [];
-      items = [];
-      particles = [];
-      boss = null;
+        // 行と列の配置計算
+        const row = Math.floor(Math.sqrt(index));
+        const col = index - row * row;
+        const spacingX = 0.55;
+        const spacingZ = 0.65;
+        const rowWidth = row * spacingX;
 
-      // パラメータリセット
-      score = 0;
-      weaponLevel = 1;
-      gameTime = 0;
-      spawnTimer = 0;
-      bossSpawned = false;
-      playerTargetX = 0;
-      playerGroup.position.set(0, 0, DEFENSE_Z);
-
-      updateHud();
-      document.getElementById('boss-hud').style.display = 'none';
-      isPlaying = true;
-    }
-
-    function updateHud() {
-      document.getElementById('level-badge').innerText = `WEAPON: Lv.${weaponLevel}`;
-      document.getElementById('score-badge').innerText = `SCORE: ${score}`;
-    }
-
-    // --- 弾の発射ロジック ---
-    let shootCooldown = 0;
-    function handleShooting(delta) {
-      shootCooldown -= delta;
-      if (shootCooldown > 0) return;
-
-      const px = playerGroup.position.x;
-      const pz = playerGroup.position.z - 0.8;
-
-      if (weaponLevel === 1) {
-        // 単発
-        spawnBullet(px, pz, 0, 0.4, false);
-        shootCooldown = 0.22;
-        playSound('shoot');
-      } else if (weaponLevel === 2) {
-        // 3-Way 拡散
-        spawnBullet(px, pz, 0, 0.4, false);
-        spawnBullet(px - 0.2, pz, -0.06, 0.4, false);
-        spawnBullet(px + 0.2, pz, 0.06, 0.4, false);
-        shootCooldown = 0.24;
-        playSound('shoot');
-      } else if (weaponLevel === 3) {
-        // ガトリング（超高速連射）
-        const offset = (Math.random() - 0.5) * 0.25;
-        spawnBullet(px + offset, pz, 0, 0.45, false);
-        shootCooldown = 0.09;
-        playSound('shoot');
-      } else {
-        // プラズマ（大玉・高火力・貫通）
-        spawnBullet(px, pz, 0, 0.35, true);
-        shootCooldown = 0.28;
-        playSound('plasma');
-      }
-    }
-
-    function spawnBullet(x, z, vx, speed, isPlasma) {
-      let geo, mat;
-      if (isPlasma) {
-        geo = new THREE.SphereGeometry(0.4, 8, 8);
-        mat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-      } else {
-        geo = new THREE.SphereGeometry(0.18, 6, 6);
-        mat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
-      }
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(x, 0.7, z);
-      scene.add(mesh);
-
-      bullets.push({
-        mesh,
-        vx,
-        vz: -speed,
-        isPlasma,
-        penetration: isPlasma ? 4 : 1
+        member.offsetX = -rowWidth / 2 + col * spacingX;
+        member.offsetZ = row * spacingZ;
       });
     }
 
-    // --- スポーン処理 ---
-    function spawnWave() {
-      // ゲートペアのスポーン（進行度に合わせて）
-      if (Math.random() < 0.35 && gates.length === 0) {
-        spawnGatePair();
+    function addSquadMembers(amount) {
+      playSfx('gate_boost');
+      const current = squadMembers.length;
+      const target = Math.min(60, current + amount); // 最大60体
+
+      for (let i = current; i < target; i++) {
+        const soldier = createSoldierMesh(false);
+        soldier.group.position.set(playerLeaderX, 0, DEFENSE_Z);
+        soldier.group.scale.set(0.1, 0.1, 0.1); // スポーン拡大演出
+        scene.add(soldier.group);
+
+        squadMembers.push({
+          mesh: soldier.group,
+          legL: soldier.legL,
+          legR: soldier.legR,
+          gun: soldier.gun,
+          offsetX: 0,
+          offsetZ: 0,
+          shootDelay: Math.random() * 0.15
+        });
       }
 
-      // ドロップアイテムのスポーン
-      if (Math.random() < 0.25 && items.length === 0 && weaponLevel < 4) {
-        spawnItem();
-      }
-
-      // 敵の出現
-      const laneWidth = (BRIDGE_WIDTH - 2) / 3;
-      const types = ['normal', 'normal', 'fast', 'heavy'];
-      const chosenType = types[Math.floor(Math.random() * types.length)];
-      const randX = (Math.floor(Math.random() * 3) - 1) * laneWidth;
-
-      let hp = 2;
-      let speed = 0.09;
-      if (chosenType === 'fast') { hp = 1; speed = 0.17; }
-      if (chosenType === 'heavy') { hp = 6; speed = 0.05; }
-
-      const mesh = createEnemyMesh(chosenType);
-      mesh.position.set(randX, 0, -65);
-      scene.add(mesh);
-
-      enemies.push({ mesh, hp, maxHp: hp, speed, type: chosenType });
+      updateSquadFormation();
     }
 
-    function spawnGatePair() {
-      const z = -60;
-      const w = BRIDGE_WIDTH / 2 - 0.4;
-      // 青ゲート（強化）と赤ゲート（弱体化）のペア
-      const posConfig = Math.random() < 0.5;
-      const leftGatePositive = posConfig;
+    function removeSquadMembers(amount) {
+      if (squadMembers.length <= 1) return;
+      playSfx('gate_penalty');
 
-      const g1 = createGate(leftGatePositive ? '+3' : '-2', leftGatePositive, -w / 2 - 0.2, z, w);
-      const g2 = createGate(!leftGatePositive ? '×2' : '÷2', !leftGatePositive, w / 2 + 0.2, z, w);
+      const removeCount = Math.min(amount, squadMembers.length - 1);
+      for (let i = 0; i < removeCount; i++) {
+        const member = squadMembers.pop();
+        spawnParticles(member.mesh.position.x, 0.6, member.mesh.position.z, 0xef4444, 8);
+        scene.remove(member.mesh);
+      }
+
+      updateSquadFormation();
+    }
+
+    // --- ゲートの生成 ---
+    function spawnGateSet() {
+      const z = -65;
+      const w = BRIDGE_WIDTH / 2 - 0.3;
+      const isLeftGood = Math.random() < 0.5;
+
+      const goodTypes = [
+        { label: '+5', val: 5, mult: false },
+        { label: '+10', val: 10, mult: false },
+        { label: '×2', val: 2, mult: true }
+      ];
+      const badTypes = [
+        { label: '-3', val: 3, mult: false },
+        { label: '-5', val: 5, mult: false },
+        { label: '÷2', val: 2, mult: true }
+      ];
+
+      const good = goodTypes[Math.floor(Math.random() * goodTypes.length)];
+      const bad = badTypes[Math.floor(Math.random() * badTypes.length)];
+
+      const g1 = createGateObject(isLeftGood ? good : bad, isLeftGood, -w / 2 - 0.15, z, w);
+      const g2 = createGateObject(!isLeftGood ? good : bad, !isLeftGood, w / 2 + 0.15, z, w);
       gates.push(g1, g2);
     }
 
-    function createGate(label, isPositive, x, z, width) {
-      const geo = new THREE.PlaneGeometry(width, 2.5);
-      const tex = createGateTexture(label, isPositive);
+    function createGateObject(data, isPositive, x, z, width) {
+      const group = new THREE.Group();
+
+      // ホログラムパネル
+      const geo = new THREE.PlaneGeometry(width, 2.8);
+      const tex = createGateTexture(data.label, isPositive);
       const mat = new THREE.MeshBasicMaterial({
         map: tex,
         transparent: true,
         side: THREE.DoubleSide
       });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(x, 1.4, z);
-      scene.add(mesh);
+      const panel = new THREE.Mesh(geo, mat);
+      panel.position.y = 1.5;
+      group.add(panel);
 
-      return { mesh, label, isPositive, width, passed: false };
-    }
+      // サイドピラー（支柱）
+      const pillarGeo = new THREE.BoxGeometry(0.2, 3.2, 0.2);
+      const pillarMat = new THREE.MeshBasicMaterial({ color: isPositive ? 0x38bdf8 : 0xef4444 });
+      const pL = new THREE.Mesh(pillarGeo, pillarMat);
+      pL.position.set(-width / 2, 1.5, 0);
+      const pR = pL.clone();
+      pR.position.x = width / 2;
+      group.add(pL, pR);
 
-    function spawnItem() {
-      const geo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
-      const mat = new THREE.MeshLambertMaterial({ color: 0x38bdf8 });
-      const mesh = new THREE.Mesh(geo, mat);
-      const x = (Math.random() - 0.5) * (BRIDGE_WIDTH - 3);
-      mesh.position.set(x, 0.7, -65);
-      scene.add(mesh);
+      group.position.set(x, 0, z);
+      scene.add(group);
 
-      items.push({ mesh });
-    }
-
-    function spawnBoss() {
-      bossSpawned = true;
-      const mesh = createBossMesh();
-      mesh.position.set(0, 0, -75);
-      scene.add(mesh);
-
-      boss = {
-        mesh,
-        hp: 75,
-        maxHp: 75,
-        speed: 0.035
+      return {
+        mesh: group,
+        data,
+        isPositive,
+        width,
+        applied: false
       };
-
-      document.getElementById('boss-hud').style.display = 'flex';
-      playSound('hit');
     }
 
-    // --- パーティクル演出 ---
-    function spawnParticles(x, y, z, color, count = 8) {
+    // --- ゲームループ制御 ---
+    function startGame() {
+      initAudio();
+      document.getElementById('start-screen').style.display = 'none';
+      document.getElementById('result-screen').style.display = 'none';
+
+      // 既存の要素を消去
+      squadMembers.forEach(m => scene.remove(m.mesh));
+      bullets.forEach(b => scene.remove(b.mesh));
+      enemies.forEach(e => scene.remove(e.mesh));
+      gates.forEach(g => scene.remove(g.mesh));
+      particles.forEach(p => scene.remove(p.mesh));
+      if (boss) scene.remove(boss.mesh);
+
+      squadMembers = [];
+      bullets = [];
+      enemies = [];
+      gates = [];
+      particles = [];
+      boss = null;
+
+      // リセット
+      score = 0;
+      gameTime = 0;
+      spawnTimer = 0;
+      gateTimer = 0.5;
+      bossSpawned = false;
+      playerLeaderX = 0;
+      targetLeaderX = 0;
+
+      // 初期の自機（リーダー）を生成
+      const leader = createSoldierMesh(true);
+      leader.group.position.set(0, 0, DEFENSE_Z);
+      scene.add(leader.group);
+      squadMembers.push({
+        mesh: leader.group,
+        legL: leader.legL,
+        legR: leader.legR,
+        gun: leader.gun,
+        offsetX: 0,
+        offsetZ: 0,
+        shootDelay: 0
+      });
+
+      updateSquadFormation();
+      document.getElementById('score-badge').innerText = `SCORE: 0`;
+      document.getElementById('boss-hud').style.display = 'none';
+
+      isPlaying = true;
+    }
+
+    // --- ボクセル破片パーティクル ---
+    function spawnParticles(x, y, z, color, count = 10) {
       for (let i = 0; i < count; i++) {
-        const geo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
-        const mat = new THREE.MeshBasicMaterial({ color });
+        const geo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
+        const mat = new THREE.MeshLambertMaterial({ color });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.position.set(x, y, z);
         scene.add(mesh);
 
         particles.push({
           mesh,
-          vx: (Math.random() - 0.5) * 0.25,
-          vy: Math.random() * 0.2 + 0.1,
-          vz: (Math.random() - 0.5) * 0.25,
-          life: 0.5
+          vx: (Math.random() - 0.5) * 0.28,
+          vy: Math.random() * 0.25 + 0.1,
+          vz: (Math.random() - 0.5) * 0.28,
+          life: 0.6
         });
       }
+    }
+
+    // --- 射撃ロジック ---
+    let globalShootTimer = 0;
+    function handleSquadShooting(delta) {
+      globalShootTimer -= delta;
+      if (globalShootTimer > 0) return;
+      globalShootTimer = 0.16; // 連射速度
+
+      playSfx('shoot');
+
+      // 全部隊が一斉射撃（個々の銃口から発射）
+      squadMembers.forEach((member) => {
+        const pos = member.mesh.position;
+        const bGeo = new THREE.SphereGeometry(0.18, 6, 6);
+        const bMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+        const bMesh = new THREE.Mesh(bGeo, bMat);
+        bMesh.position.set(pos.x + 0.28, 0.6, pos.z - 0.4);
+        scene.add(bMesh);
+
+        bullets.push({
+          mesh: bMesh,
+          vz: -0.55,
+          vx: (Math.random() - 0.5) * 0.02
+        });
+      });
     }
 
     // --- メインアップデート ---
     function animate() {
       requestAnimationFrame(animate);
 
-      const delta = 0.016; // 約60fps想定
+      const delta = 0.016;
 
       if (isPlaying) {
         gameTime += delta;
 
+        // サイバー床のスクロール（スピード感）
+        if (cyberFloor) {
+          cyberFloor.material.map.offset.y -= 0.008;
+        }
+
+        // カメラシェイク
+        if (shakeIntensity > 0) {
+          camera.position.x = (Math.random() - 0.5) * shakeIntensity;
+          camera.position.y = 15 + (Math.random() - 0.5) * shakeIntensity;
+          shakeIntensity *= 0.88;
+          if (shakeIntensity < 0.01) {
+            shakeIntensity = 0;
+            camera.position.set(0, 15, 23);
+          }
+        }
+
         // プレイヤーの移動追従
-        playerGroup.position.x += (playerTargetX - playerGroup.position.x) * 0.25;
+        playerLeaderX += (targetLeaderX - playerLeaderX) * 0.22;
 
-        // 自動射撃
-        handleShooting(delta);
+        // 部隊の隊列追従 & 歩行アニメーション
+        const walkCycle = Math.sin(gameTime * 20);
+        squadMembers.forEach((member) => {
+          // 目標位置へスムーズ移動
+          const targetX = playerLeaderX + member.offsetX;
+          const targetZ = DEFENSE_Z + member.offsetZ;
+          member.mesh.position.x += (targetX - member.mesh.position.x) * 0.25;
+          member.mesh.position.z += (targetZ - member.mesh.position.z) * 0.25;
 
-        // スポーン制御
+          // スポーン拡大
+          if (member.mesh.scale.x < 1.0) {
+            member.mesh.scale.addScalar(0.1);
+            if (member.mesh.scale.x > 1.0) member.mesh.scale.set(1, 1, 1);
+          }
+
+          // 足踏みアニメ
+          member.legL.rotation.x = walkCycle * 0.6;
+          member.legR.rotation.x = -walkCycle * 0.6;
+          member.mesh.position.y = Math.abs(walkCycle) * 0.08;
+        });
+
+        // 一斉射撃
+        handleSquadShooting(delta);
+
+        // ゲートのスポーン管理（7〜9秒間隔）
+        gateTimer -= delta;
+        if (gateTimer <= 0 && gates.length === 0 && !bossSpawned) {
+          spawnGateSet();
+          gateTimer = 8.0;
+        }
+
+        // 敵のスポーン（徐々に激しく）
         spawnTimer -= delta;
-        if (spawnTimer <= 0) {
-          spawnWave();
-          spawnTimer = 1.1 - Math.min(gameTime * 0.015, 0.6); // 徐々に加速
+        if (spawnTimer <= 0 && !bossSpawned) {
+          const laneW = (BRIDGE_WIDTH - 2) / 3;
+          const types = ['normal', 'normal', 'fast', 'heavy'];
+          const type = types[Math.floor(Math.random() * types.length)];
+          const x = (Math.floor(Math.random() * 3) - 1) * laneW;
+
+          const eMesh = createEnemyMesh(type);
+          eMesh.position.set(x, 0, -65);
+          scene.add(eMesh);
+
+          let hp = 3;
+          let speed = 0.09;
+          if (type === 'fast') { hp = 2; speed = 0.18; }
+          if (type === 'heavy') { hp = 10; speed = 0.045; }
+
+          enemies.push({ mesh: eMesh, hp, maxHp: hp, speed, type });
+          spawnTimer = Math.max(0.6, 1.3 - gameTime * 0.015);
         }
 
-        // ボス出現判定（40秒経過またはスコア到達）
-        if (!bossSpawned && (gameTime > 35 || score >= 200)) {
-          spawnBoss();
+        // ボス出現判定（45秒経過またはスコア到達）
+        if (!bossSpawned && (gameTime > 40 || score >= 350)) {
+          bossSpawned = true;
+          const bMesh = createBossMesh();
+          bMesh.position.set(0, 0, -75);
+          scene.add(bMesh);
+
+          boss = { mesh: bMesh, hp: 120, maxHp: 120, speed: 0.032 };
+          document.getElementById('boss-hud').style.display = 'flex';
+          shakeIntensity = 0.6;
         }
 
-        // 1. 弾の移動と判定
+        // 1. ゲートの移動 & 自軍通過判定（味方増殖）
+        for (let i = gates.length - 1; i >= 0; i--) {
+          const g = gates[i];
+          g.mesh.position.z += 0.11;
+
+          // プレイヤー部隊がゲートを通過した判定
+          if (!g.applied && Math.abs(g.mesh.position.z - DEFENSE_Z) < 1.0) {
+            const leftEdge = g.mesh.position.x - g.width / 2;
+            const rightEdge = g.mesh.position.x + g.width / 2;
+
+            if (playerLeaderX >= leftEdge && playerLeaderX <= rightEdge) {
+              g.applied = true;
+              shakeIntensity = 0.2;
+
+              if (g.isPositive) {
+                if (g.data.mult) {
+                  addSquadMembers(squadMembers.length); // 2倍
+                } else {
+                  addSquadMembers(g.data.val); // +5, +10
+                }
+              } else {
+                if (g.data.mult) {
+                  removeSquadMembers(Math.floor(squadMembers.length / 2)); // ÷2
+                } else {
+                  removeSquadMembers(g.data.val); // -3, -5
+                }
+              }
+            }
+          }
+
+          if (g.mesh.position.z > DEFENSE_Z + 4) {
+            scene.remove(g.mesh);
+            gates.splice(i, 1);
+          }
+        }
+
+        // 2. 弾の移動とゲート増殖・敵ヒット判定
         for (let i = bullets.length - 1; i >= 0; i--) {
           const b = bullets[i];
-          b.mesh.position.x += b.vx;
           b.mesh.position.z += b.vz;
+          b.mesh.position.x += b.vx;
 
-          // 画面奥へ消滅
           if (b.mesh.position.z < -80) {
             scene.remove(b.mesh);
             bullets.splice(i, 1);
             continue;
           }
 
-          // ゲートとの交差判定（弾増殖ギミック）
+          // 弾がゲートを通過したら弾も増殖！
           for (let g of gates) {
-            if (Math.abs(b.mesh.position.z - g.mesh.position.z) < 0.6 &&
+            if (Math.abs(b.mesh.position.z - g.mesh.position.z) < 0.5 &&
                 Math.abs(b.mesh.position.x - g.mesh.position.x) < g.width / 2) {
-              // ゲート通過
-              if (g.isPositive) {
-                // 増殖
-                playSound('gate');
-                spawnParticles(b.mesh.position.x, 1.2, b.mesh.position.z, 0x38bdf8, 4);
-                // 拡散弾を左右に追加
-                spawnBullet(b.mesh.position.x - 0.3, b.mesh.position.z - 1.2, -0.04, 0.42, b.isPlasma);
-                spawnBullet(b.mesh.position.x + 0.3, b.mesh.position.z - 1.2, 0.04, 0.42, b.isPlasma);
-              } else {
-                // 減少・消滅
-                spawnParticles(b.mesh.position.x, 1.2, b.mesh.position.z, 0xef4444, 4);
-                scene.remove(b.mesh);
-                bullets.splice(i, 1);
-                break;
+              if (g.isPositive && !b.amplified) {
+                b.amplified = true;
+                // 分裂弾を生成
+                const extra1 = { mesh: b.mesh.clone(), vz: b.vz, vx: b.vx - 0.04, amplified: true };
+                const extra2 = { mesh: b.mesh.clone(), vz: b.vz, vx: b.vx + 0.04, amplified: true };
+                scene.add(extra1.mesh, extra2.mesh);
+                bullets.push(extra1, extra2);
               }
             }
           }
-        }
 
-        // 2. ゲートの移動
-        for (let i = gates.length - 1; i >= 0; i--) {
-          const g = gates[i];
-          g.mesh.position.z += 0.08;
-          if (g.mesh.position.z > DEFENSE_Z + 2) {
-            scene.remove(g.mesh);
-            gates.splice(i, 1);
-          }
-        }
+          // 敵との衝突
+          let hit = false;
+          for (let j = enemies.length - 1; j >= 0; j--) {
+            const e = enemies[j];
+            if (e.mesh.position.distanceTo(b.mesh.position) < 0.9) {
+              e.hp--;
+              spawnParticles(b.mesh.position.x, 0.6, b.mesh.position.z, 0xfacc15, 3);
+              hit = true;
 
-        // 3. アイテムの移動・取得
-        for (let i = items.length - 1; i >= 0; i--) {
-          const it = items[i];
-          it.mesh.position.z += 0.08;
-          it.mesh.rotation.y += 0.03;
-
-          // プレイヤーとの接触判定
-          const dist = it.mesh.position.distanceTo(playerGroup.position);
-          if (dist < 1.2) {
-            weaponLevel = Math.min(4, weaponLevel + 1);
-            updateHud();
-            playSound('powerup');
-            spawnParticles(it.mesh.position.x, 1, it.mesh.position.z, 0x38bdf8, 12);
-            scene.remove(it.mesh);
-            items.splice(i, 1);
-            continue;
-          }
-
-          if (it.mesh.position.z > DEFENSE_Z + 2) {
-            scene.remove(it.mesh);
-            items.splice(i, 1);
-          }
-        }
-
-        // 4. 敵の移動・衝突判定
-        for (let i = enemies.length - 1; i >= 0; i--) {
-          const e = enemies[i];
-          e.mesh.position.z += e.speed;
-
-          // 防衛ライン突破（ゲームオーバー）
-          if (e.mesh.position.z >= DEFENSE_Z) {
-            endGame(false);
-            return;
-          }
-
-          // 弾との衝突判定
-          for (let j = bullets.length - 1; j >= 0; j--) {
-            const b = bullets[j];
-            const dist = e.mesh.position.distanceTo(b.mesh.position);
-            if (dist < 0.9) {
-              e.hp -= b.isPlasma ? 3 : 1;
-              b.penetration--;
-
-              playSound('hit');
-              spawnParticles(b.mesh.position.x, 0.8, b.mesh.position.z, 0xfacc15, 4);
-
-              if (b.penetration <= 0) {
-                scene.remove(b.mesh);
-                bullets.splice(j, 1);
-              }
-
-              // 敵撃破
               if (e.hp <= 0) {
-                spawnParticles(e.mesh.position.x, 0.8, e.mesh.position.z, 0xef4444, 10);
+                spawnParticles(e.mesh.position.x, 0.6, e.mesh.position.z, 0xef4444, 12);
+                playSfx('explode');
                 scene.remove(e.mesh);
-                enemies.splice(i, 1);
-                score += e.type === 'heavy' ? 25 : 10;
-                updateHud();
-                break;
+                enemies.splice(j, 1);
+                score += e.type === 'heavy' ? 30 : 10;
+                document.getElementById('score-badge').innerText = `SCORE: ${score}`;
               }
+              break;
             }
           }
-        }
 
-        // 5. ボスの移動・衝突判定
-        if (boss) {
-          boss.mesh.position.z += boss.speed;
-
-          // 防衛ライン到達
-          if (boss.mesh.position.z >= DEFENSE_Z - 1.5) {
-            endGame(false);
-            return;
-          }
-
-          // 弾との衝突判定
-          for (let j = bullets.length - 1; j >= 0; j--) {
-            const b = bullets[j];
+          // ボスとの衝突
+          if (!hit && boss) {
             if (Math.abs(b.mesh.position.z - boss.mesh.position.z) < 1.6 &&
                 Math.abs(b.mesh.position.x - boss.mesh.position.x) < 1.6) {
-              boss.hp -= b.isPlasma ? 3 : 1;
-              b.penetration--;
+              boss.hp--;
+              hit = true;
+              spawnParticles(b.mesh.position.x, 2.2, b.mesh.position.z, 0xf59e0b, 4);
 
-              playSound('hit');
-              spawnParticles(b.mesh.position.x, 2.0, b.mesh.position.z, 0xf59e0b, 5);
-
-              if (b.penetration <= 0) {
-                scene.remove(b.mesh);
-                bullets.splice(j, 1);
-              }
-
-              // HPバー更新
               const pct = Math.max(0, (boss.hp / boss.maxHp) * 100);
               document.getElementById('boss-bar-fill').style.width = `${pct}%`;
 
-              // ボス撃破（ゲームクリア）
               if (boss.hp <= 0) {
-                spawnParticles(boss.mesh.position.x, 2.5, boss.mesh.position.z, 0xef4444, 40);
+                spawnParticles(boss.mesh.position.x, 2.5, boss.mesh.position.z, 0xef4444, 50);
+                shakeIntensity = 0.8;
+                playSfx('explode');
                 scene.remove(boss.mesh);
                 boss = null;
-                score += 200;
-                updateHud();
+                score += 300;
+                document.getElementById('score-badge').innerText = `SCORE: ${score}`;
                 endGame(true);
                 return;
               }
             }
           }
+
+          if (hit) {
+            scene.remove(b.mesh);
+            bullets.splice(i, 1);
+          }
         }
 
-        // 6. パーティクルの減衰
+        // 3. 敵の移動 & 防衛突破判定
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          const e = enemies[i];
+          e.mesh.position.z += e.speed;
+
+          // 防衛ライン到達
+          if (e.mesh.position.z >= DEFENSE_Z) {
+            shakeIntensity = 0.5;
+            endGame(false);
+            return;
+          }
+        }
+
+        // 4. ボスの移動 & 防衛突破判定
+        if (boss) {
+          boss.mesh.position.z += boss.speed;
+          if (boss.mesh.position.z >= DEFENSE_Z - 1.2) {
+            shakeIntensity = 0.6;
+            endGame(false);
+            return;
+          }
+        }
+
+        // 5. パーティクルの物理更新
         for (let i = particles.length - 1; i >= 0; i--) {
           const p = particles[i];
           p.mesh.position.x += p.vx;
           p.mesh.position.y += p.vy;
           p.mesh.position.z += p.vz;
+          p.vy -= 0.012; // 重力
           p.life -= delta;
           if (p.life <= 0) {
             scene.remove(p.mesh);
@@ -897,31 +1060,29 @@
       renderer.render(scene, camera);
     }
 
-    // --- ゲーム終了画面 ---
+    // --- ゲームオーバー / クリア ---
     function endGame(isClear) {
       isPlaying = false;
-      const resScreen = document.getElementById('result-screen');
+      const res = document.getElementById('result-screen');
       const title = document.getElementById('result-title');
       const desc = document.getElementById('result-desc');
 
       if (isClear) {
-        title.innerText = 'MISSION CLEAR!';
+        title.innerText = 'MISSION ACCOMPLISHED!';
         title.style.color = '#38bdf8';
-        desc.innerHTML = `巨大ボスを殲滅し防衛ラインを死守した！<br><br>最終スコア: <b>${score}</b>`;
+        desc.innerHTML = `大部隊でタイタンメカを完全粉砕！<br>防衛ラインの死守に成功した！<br><br>最終部隊規模: <b>${squadMembers.length}人</b><br>最終スコア: <b>${score}</b>`;
       } else {
-        title.innerText = 'DEFENSE FAILED';
+        title.innerText = 'DEFENSE BREACHED';
         title.style.color = '#ef4444';
-        desc.innerHTML = `敵部隊に防衛線を突破された...<br><br>最終スコア: <b>${score}</b>`;
+        desc.innerHTML = `敵軍に防衛ラインを突破された...<br><br>最終スコア: <b>${score}</b>`;
       }
 
-      resScreen.style.display = 'flex';
+      res.style.display = 'flex';
     }
 
-    // イベントバインド
     document.getElementById('start-btn').addEventListener('click', startGame);
     document.getElementById('retry-btn').addEventListener('click', startGame);
 
-    // 起動
     window.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
