@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>DEAD BRIDGE: ZERO TOLERANCE</title>
+  <title>Z-OUTBREAK: SPECIAL FORCES</title>
   <style>
     * {
       box-sizing: border-box;
@@ -34,7 +34,7 @@
       height: 100%;
     }
 
-    /* 映画的シネマティックビネット */
+    /* シネマティックビネット */
     #vignette {
       position: absolute;
       inset: 0;
@@ -293,11 +293,11 @@
 
     <!-- スタート画面 -->
     <div id="start-screen" class="screen-overlay">
-      <h1 class="screen-title">DEAD BRIDGE: FINAL DEFENSE</h1>
+      <h1 class="screen-title">Z-OUTBREAK: FIRING LINE</h1>
       <p id="start-subtext" class="screen-desc">
-        <b>【ミリタリー一斉射撃・最終防衛戦】</b><br>
-        アサルトライフルで迫り来る<b>ゾンビの大群</b>を撃滅せよ！<br>
-        作戦ゲートを撃ち抜いて部隊を増やし、火力を集中！<br>
+        <b>【特殊部隊 VS ゾンビ大群・迎撃戦】</b><br>
+        アサルトライフルを両手で構え、迫り来る<b>ゾンビの大群</b>を撃滅せよ！<br>
+        ゲートを撃ち抜いて射撃部隊を増やし、反動に耐えて弾幕を張れ。<br>
         防衛ラインを突破されると全滅する。死守せよ！
       </p>
 
@@ -308,7 +308,7 @@
         </div>
       </div>
 
-      <button id="start-btn" class="btn-main" style="display: none; margin-top: 15px;">START MISSION</button>
+      <button id="start-btn" class="btn-main" style="display: none; margin-top: 15px;">COMMENCE ENGAGEMENT</button>
     </div>
 
     <!-- リザルト画面 -->
@@ -326,7 +326,7 @@
       el.innerText = `Line ${line}: ${msg}`;
     };
 
-    // --- Web Audio サウンドシンセ ---
+    // --- Web Audio リアル音響 ---
     let audioCtx = null;
     let bgmStep = 0;
     let bgmTimer = 0;
@@ -389,7 +389,7 @@
           const noise = audioCtx.createBufferSource();
           noise.buffer = buffer;
           const gain = audioCtx.createGain();
-          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.setValueAtTime(0.13, now);
           gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
 
           const osc = audioCtx.createOscillator();
@@ -576,136 +576,209 @@
       return new THREE.CanvasTexture(cvs);
     }
 
-    // --- フォールバック用自律生成モデル（アセット通信エラー時も100%起動） ---
-    function createFallbackProceduralSoldier(isLeader) {
-      const g = new THREE.Group();
-      const col = isLeader ? 0x1e3a8a : 0x57534e;
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.22, 0.65, 12), new THREE.MeshStandardMaterial({ color: col, roughness: 0.6 }));
-      body.position.y = 0.65; body.castShadow = true;
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.4 }));
-      head.position.y = 1.15; head.castShadow = true;
-      const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.7, 8), new THREE.MeshStandardMaterial({ color: 0x09090b, metalness: 0.8 }));
-      gun.rotation.x = Math.PI / 2; gun.position.set(0.26, 0.65, -0.35); gun.castShadow = true;
-      g.add(body, head, gun);
-      return g;
+    // --- 特殊部隊用タクティカルアタッチメント ---
+    function createSpecialForcesRifle() {
+      const gun = new THREE.Group();
+      const gunMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.3, metalness: 0.85 });
+
+      // レシーバー本体
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.65), gunMat);
+      // サプレッサー（銃口消音器）
+      const suppressor = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.3, 8), gunMat);
+      suppressor.rotation.x = Math.PI / 2;
+      suppressor.position.set(0, 0.02, -0.45);
+      // マガジン
+      const mag = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.22, 0.1), gunMat);
+      mag.position.set(0, -0.12, -0.05);
+      // ホロサイト（光学照準器）
+      const sight = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.14), gunMat);
+      sight.position.set(0, 0.09, -0.05);
+      // フォアグリップ
+      const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.15, 6), gunMat);
+      grip.position.set(0, -0.1, -0.25);
+
+      gun.add(body, suppressor, mag, sight, grip);
+      gun.position.set(0.18, 1.02, -0.42);
+      gun.castShadow = true;
+      return gun;
     }
 
-    function createFallbackProceduralZombie(type) {
-      const g = new THREE.Group();
-      let scale = 1.0;
-      let col = 0x3f624d;
-      if (type === 'runner') { scale = 0.85; col = 0x991b1b; }
-      if (type === 'tank') { scale = 1.8; col = 0x1e293b; }
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.24 * scale, 0.2 * scale, 0.65 * scale, 12), new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 }));
-      body.position.y = 0.65 * scale; body.castShadow = true;
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.18 * scale, 12, 12), new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 }));
-      head.position.y = 1.15 * scale; head.castShadow = true;
-      g.add(body, head);
-      return { group: g, mats: [body.material, head.material], scale };
+    // 4眼式ナイトビジョン（GPNVG-18）
+    function createGPNVG18() {
+      const nvg = new THREE.Group();
+      const mountMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.5 });
+      const lensMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 }); // 青白く光る4つのレンズ
+
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.06, 0.08), mountMat);
+      for (let i = -1.5; i <= 1.5; i += 1.0) {
+        const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.1, 8), lensMat);
+        lens.rotation.x = Math.PI / 2;
+        lens.position.set(i * 0.08, 0, -0.06);
+        nvg.add(lens);
+      }
+      nvg.add(base);
+      nvg.position.set(0, 1.55, -0.22);
+      return nvg;
+    }
+
+    // --- ゾンビ専用アタッチメント（血走った眼球・牙・血糊） ---
+    function createZombieFaceGore(scale = 1.0) {
+      const gore = new THREE.Group();
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0022 }); // 爛々と光る赤眼
+      const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.045 * scale, 8, 8), eyeMat);
+      eyeL.position.set(-0.08 * scale, 1.48 * scale, 0.22 * scale);
+      const eyeR = eyeL.clone();
+      eyeR.position.x = 0.08 * scale;
+
+      // 裂けた口・露出した歯
+      const mouthMat = new THREE.MeshStandardMaterial({ color: 0x7f1d1d, roughness: 0.6 });
+      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.16 * scale, 0.06 * scale, 0.06 * scale), mouthMat);
+      mouth.position.set(0, 1.34 * scale, 0.22 * scale);
+
+      // 肩の露出した骨・変異腫瘍
+      const boneMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.4 });
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.06 * scale, 0.25 * scale, 5), boneMat);
+      spike.rotation.z = Math.PI / 4;
+      spike.position.set(-0.35 * scale, 1.35 * scale, 0);
+
+      gore.add(eyeL, eyeR, mouth, spike);
+      return gore;
+    }
+
+    // --- ボーン探索ユーティリティ ---
+    function extractBones(model) {
+      const bones = {};
+      model.traverse(child => {
+        if (child.isBone) {
+          const name = child.name;
+          if (name.includes('RightArm')) bones.rightArm = child;
+          if (name.includes('RightForeArm')) bones.rightForeArm = child;
+          if (name.includes('RightHand')) bones.rightHand = child;
+          if (name.includes('LeftArm')) bones.leftArm = child;
+          if (name.includes('LeftForeArm')) bones.leftForeArm = child;
+          if (name.includes('LeftHand')) bones.leftHand = child;
+          if (name.includes('Spine1') || name.includes('Spine')) bones.spine = child;
+          if (name.includes('Neck')) bones.neck = child;
+          if (name.includes('Head')) bones.head = child;
+        }
+      });
+      return bones;
     }
 
     // --- キャラクター生成 ---
-    function spawnSoldierInstance(isLeader = false) {
-      if (hasLoadedAsset && baseSoldierModel) {
-        const model = THREE.SkeletonUtils.clone(baseSoldierModel);
-        model.scale.set(1.15, 1.15, 1.15);
+    // 1. 味方（両手でライフルを構え、4眼NVGを装着した特殊部隊）
+    function spawnSpecialForcesInstance(isLeader = false) {
+      const model = THREE.SkeletonUtils.clone(baseSoldierModel);
+      model.scale.set(1.15, 1.15, 1.15);
 
-        const mixer = new THREE.AnimationMixer(model);
-        const aimClip = soldierAnimations[0]; // Aim待機ポーズ
-        const aimAction = mixer.clipAction(aimClip);
-        aimAction.play();
+      const mixer = new THREE.AnimationMixer(model);
+      // animations[0] (Idle) をベースに固定
+      const action = mixer.clipAction(soldierAnimations[0]);
+      action.play();
 
-        model.traverse((child) => {
-          if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-            child.material = child.material.clone();
-            if (isLeader) child.material.color.setHex(0x93c5fd);
-          }
-        });
-        return { model, mixer };
-      } else {
-        const model = createFallbackProceduralSoldier(isLeader);
-        return { model, mixer: null };
-      }
-    }
-
-    function spawnZombieInstance(type = 'normal') {
-      if (hasLoadedAsset && baseSoldierModel) {
-        const model = THREE.SkeletonUtils.clone(baseSoldierModel);
-        let scale = 1.15;
-        if (type === 'runner') scale = 0.95;
-        if (type === 'tank') scale = 1.9;
-
-        model.scale.set(scale, scale, scale);
-
-        const mixer = new THREE.AnimationMixer(model);
-        let clip = soldierAnimations[3] || soldierAnimations[0]; // Walk
-        let animSpeed = 0.85;
-
-        if (type === 'runner') {
-          clip = soldierAnimations[1]; // Run
-          animSpeed = 1.4;
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          child.material = child.material.clone();
+          child.material.color.setHex(isLeader ? 0x1e3a8a : 0x334155); // ネイビーシールズ・ダーク迷彩
+          child.material.roughness = 0.7;
         }
-        const action = mixer.clipAction(clip);
-        action.timeScale = animSpeed;
-        action.play();
+      });
 
-        const mats = [];
-        model.traverse((child) => {
-          if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-            child.material = child.material.clone();
+      // アサルトライフル ＆ 4眼ナイトビジョンを直接装備
+      const rifle = createSpecialForcesRifle();
+      const nvg = createGPNVG18();
+      model.add(rifle, nvg);
 
-            if (type === 'runner') child.material.color.setHex(0x991b1b);
-            else if (type === 'tank') child.material.color.setHex(0x1e293b);
-            else child.material.color.setHex(0x3f624d);
-
-            child.material.roughness = 0.85;
-            mats.push(child.material);
-          }
-        });
-
-        model.rotation.y = Math.PI;
-        return { model, mixer, mats, scale };
-      } else {
-        const pz = createFallbackProceduralZombie(type);
-        return { model: pz.group, mixer: null, mats: pz.mats, scale: pz.scale };
-      }
+      const bones = extractBones(model);
+      return { model, mixer, bones, rifle };
     }
 
-    function spawnGoliathBossInstance() {
-      if (hasLoadedAsset && baseSoldierModel) {
-        const model = THREE.SkeletonUtils.clone(baseSoldierModel);
-        const scale = 3.6;
-        model.scale.set(scale, scale, scale);
+    // 2. 敵（腕を前に突き出し、首を傾げてフラフラ歩く本物のゾンビ）
+    function spawnZombieInstance(type = 'normal') {
+      const model = THREE.SkeletonUtils.clone(baseSoldierModel);
+      let scale = 1.15;
+      if (type === 'runner') scale = 0.95;
+      if (type === 'tank') scale = 1.95;
 
-        const mixer = new THREE.AnimationMixer(model);
-        const clip = soldierAnimations[3] || soldierAnimations[0];
-        const action = mixer.clipAction(clip);
-        action.timeScale = 0.55;
-        action.play();
+      model.scale.set(scale, scale, scale);
 
-        const mats = [];
-        model.traverse((child) => {
-          if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-            child.material = child.material.clone();
-            child.material.color.setHex(0x450a0a);
-            child.material.roughness = 0.9;
-            mats.push(child.material);
-          }
-        });
+      const mixer = new THREE.AnimationMixer(model);
+      let clip = soldierAnimations[3] || soldierAnimations[0]; // Walk
+      let animSpeed = 0.85;
 
-        model.rotation.y = Math.PI;
-        return { model, mixer, mats };
-      } else {
-        const pz = createFallbackProceduralZombie('tank');
-        pz.group.scale.set(3.2, 3.2, 3.2);
-        return { model: pz.group, mixer: null, mats: pz.mats };
+      if (type === 'runner') {
+        clip = soldierAnimations[1]; // Run（猛ダッシュ）
+        animSpeed = 1.45;
       }
+      const action = mixer.clipAction(clip);
+      action.timeScale = animSpeed;
+      action.play();
+
+      const mats = [];
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          child.material = child.material.clone();
+
+          // 腐敗皮膚カラー（血染めランナー、黒変異タンク、緑腐敗ウォーカー）
+          if (type === 'runner') child.material.color.setHex(0x7f1d1d);
+          else if (type === 'tank') child.material.color.setHex(0x18181b);
+          else child.material.color.setHex(0x3f5545);
+
+          child.material.roughness = 0.9;
+          mats.push(child.material);
+        }
+      });
+
+      // 顔に血走った眼球・牙・血糊スプラッターをアタッチ
+      const faceGore = createZombieFaceGore(1.0);
+      model.add(faceGore);
+
+      model.rotation.y = Math.PI; // 正面（プレイヤー側）へ向ける
+      const bones = extractBones(model);
+
+      return { model, mixer, bones, mats, scale };
+    }
+
+    // 3. 巨大変異体ボス（GOLIATH）
+    function spawnGoliathBossInstance() {
+      const model = THREE.SkeletonUtils.clone(baseSoldierModel);
+      const scale = 3.6;
+      model.scale.set(scale, scale, scale);
+
+      const mixer = new THREE.AnimationMixer(model);
+      const clip = soldierAnimations[3] || soldierAnimations[0];
+      const action = mixer.clipAction(clip);
+      action.timeScale = 0.5;
+      action.play();
+
+      const mats = [];
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          child.material = child.material.clone();
+          child.material.color.setHex(0x310a0a); // ドス黒い変異筋肉
+          child.material.roughness = 0.9;
+          mats.push(child.material);
+        }
+      });
+
+      // 脈打つ変異心臓コア
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), new THREE.MeshBasicMaterial({ color: 0xff0044 }));
+      core.position.set(0, 1.25, 0.2);
+      model.add(core);
+
+      const faceGore = createZombieFaceGore(1.2);
+      model.add(faceGore);
+
+      model.rotation.y = Math.PI;
+      const bones = extractBones(model);
+
+      return { model, mixer, bones, mats, core };
     }
 
     // --- 初期セットアップ ---
@@ -830,7 +903,6 @@
       loadExternal3DAssetsWithTimeout();
     }
 
-    // タイムアウト付きセーフローダー（通信遮断時も3秒でフォールバック起動）
     function loadExternal3DAssetsWithTimeout() {
       let completed = false;
       const onReady = () => {
@@ -844,7 +916,7 @@
       const timer = setTimeout(() => {
         hasLoadedAsset = false;
         onReady();
-      }, 3500);
+      }, 4000);
 
       const loader = new THREE.GLTFLoader();
       const assetUrl = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/models/gltf/Soldier.glb';
@@ -930,12 +1002,14 @@
       const cur = squadMembers.length;
       const target = Math.min(60, cur + cnt);
       for (let i = cur; i < target; i++) {
-        const u = spawnSoldierInstance(false);
+        const u = spawnSpecialForcesInstance(false);
         u.model.position.set(playerLeaderX, 0, DEFENSE_Z);
         scene.add(u.model);
         squadMembers.push({
           mesh: u.model,
           mixer: u.mixer,
+          bones: u.bones,
+          rifle: u.rifle,
           recoil: 0,
           offsetX: 0,
           offsetZ: 0
@@ -944,7 +1018,6 @@
       updateSquadLayout();
     }
 
-    // 【バグ修正】兵士が確実に戦死し、0人で確実にGAME OVERになるロジック
     function removeSquad(cnt) {
       playSfx('splat');
       shakeIntensity = 0.5;
@@ -963,7 +1036,6 @@
       }
       updateSquadLayout();
 
-      // 全滅判定（確実に発動）
       if (squadMembers.length <= 0) {
         endGame(false);
       }
@@ -1144,13 +1216,15 @@
       playerLeaderX = 0;
       targetX = 0;
 
-      // 自軍リーダーの出撃
-      const leader = spawnSoldierInstance(true);
+      // 特殊部隊リーダーの出撃（銃構えエイム姿勢）
+      const leader = spawnSpecialForcesInstance(true);
       leader.model.position.set(0, 0, DEFENSE_Z);
       scene.add(leader.model);
       squadMembers.push({
         mesh: leader.model,
         mixer: leader.mixer,
+        bones: leader.bones,
+        rifle: leader.rifle,
         recoil: 0,
         offsetX: 0,
         offsetZ: 0
@@ -1272,21 +1346,30 @@
 
         playerLeaderX += (targetX - playerLeaderX) * 0.22;
 
-        // 味方兵士の更新
+        // --- 味方特殊部隊の更新（両手エイム姿勢＆射撃リコイル） ---
         squadMembers.forEach(m => {
           if (m.recoil > 0) {
             m.recoil -= delta * 12;
             if (m.recoil < 0) m.recoil = 0;
           }
 
-          const recoilOffsetZ = m.recoil * 0.18;
-          const recoilRotX = -m.recoil * 0.12;
+          const recoilZ = m.recoil * 0.14; // 撃つたびに後方に反動キックバック
+          const recoilRotX = -m.recoil * 0.08;
 
           m.mesh.position.x += (playerLeaderX + m.offsetX - m.mesh.position.x) * 0.25;
-          m.mesh.position.z += (DEFENSE_Z + m.offsetZ + recoilOffsetZ - m.mesh.position.z) * 0.25;
+          m.mesh.position.z += (DEFENSE_Z + m.offsetZ + recoilZ - m.mesh.position.z) * 0.25;
           m.mesh.rotation.x = recoilRotX;
 
           if (m.mixer) m.mixer.update(delta);
+
+          // ボーンを直接プログラマティック制御（両手でライフルを構える姿勢）
+          if (m.bones) {
+            if (m.bones.rightArm) m.bones.rightArm.rotation.set(-1.25, 0.45, 0.2 + m.recoil * 0.15);
+            if (m.bones.rightForeArm) m.bones.rightForeArm.rotation.set(0, 0, 1.35);
+            if (m.bones.leftArm) m.bones.leftArm.rotation.set(-1.05, -0.55, -0.2);
+            if (m.bones.leftForeArm) m.bones.leftForeArm.rotation.set(0, 0, -1.2);
+            if (m.bones.head) m.bones.head.rotation.set(0.12, 0, 0); // 照準を真っ直ぐ睨む
+          }
         });
 
         // フルオート射撃ロジック
@@ -1300,15 +1383,17 @@
           muzzleLight.intensity = 2.8;
 
           squadMembers.forEach(m => {
-            m.recoil = 1.0;
+            m.recoil = 1.0; // 反動トリガー
 
-            const muzzleX = m.mesh.position.x + 0.24;
-            const muzzleY = 0.95;
-            const muzzleZ = m.mesh.position.z - 0.6;
+            // 銃口の正確な3D位置
+            const muzzleX = m.mesh.position.x + 0.22;
+            const muzzleY = 1.05;
+            const muzzleZ = m.mesh.position.z - 0.85;
 
+            // マズルフラッシュ
             spawnMuzzleFlash(muzzleX, muzzleY, muzzleZ);
 
-            // 超音速曳光弾
+            // 超音速曳光弾（トレーサー弾）
             const tracerGeo = new THREE.CylinderGeometry(0.035, 0.05, 1.4, 6);
             tracerGeo.rotateX(Math.PI / 2);
             const tracerMat = new THREE.MeshBasicMaterial({
@@ -1325,10 +1410,11 @@
               vz: -1.35,
               vx: (Math.random() - 0.5) * 0.02,
               penetration: 2,
-              prevZ: muzzleZ - 0.7 // スウィープ判定用
+              prevZ: muzzleZ - 0.7
             });
 
-            spawnCasing(muzzleX + 0.15, muzzleY, muzzleZ + 0.3);
+            // 薬莢エジェクション
+            spawnCasing(muzzleX + 0.15, muzzleY, muzzleZ + 0.35);
           });
         }
 
@@ -1371,10 +1457,12 @@
             zombies.push({
               mesh: zObj.model,
               mixer: zObj.mixer,
+              bones: zObj.bones,
               mats: zObj.mats,
               hp,
               type,
-              speed: spd
+              speed: spd,
+              wobbleSeed: Math.random() * 10
             });
           }
 
@@ -1390,6 +1478,7 @@
           boss = {
             mesh: bObj.model,
             mixer: bObj.mixer,
+            bones: bObj.bones,
             mats: bObj.mats,
             hp: 300,
             maxHp: 300,
@@ -1400,7 +1489,7 @@
           playSfx('splat');
         }
 
-        // --- 1. 【バグ完全解消】スウィープ線分衝突判定 ---
+        // --- 1. スウィープ線分衝突判定 ---
         for (let i = bullets.length - 1; i >= 0; i--) {
           const b = bullets[i];
           const oldZ = b.prevZ !== undefined ? b.prevZ : b.mesh.position.z;
@@ -1420,7 +1509,6 @@
           // ゲート交差判定
           for (let g of gates) {
             const gz = g.mesh.position.z;
-            // 弾がゲートのZ軸を跨いだか判定（すり抜けゼロ）
             if (oldZ >= gz - 0.4 && newZ <= gz + 0.4) {
               if (Math.abs(b.mesh.position.x - g.mesh.position.x) < g.width / 2) {
                 hit = true;
@@ -1444,17 +1532,15 @@
             }
           }
 
-          // ゾンビ衝突判定（スウィープ区間交差 ＋ 水平XZ判定）
+          // ゾンビ衝突判定
           if (!hit) {
             for (let j = zombies.length - 1; j >= 0; j--) {
               const z = zombies[j];
               const zx = z.mesh.position.x;
               const zz = z.mesh.position.z;
-              const hitRadius = z.type === 'tank' ? 1.4 : 0.85;
+              const hitRadius = z.type === 'tank' ? 1.5 : 0.95;
 
-              // 弾がこのフレームでゾンビのZ帯域を通過したか判定
               const inZRange = (oldZ >= zz - hitRadius) && (newZ <= zz + hitRadius);
-              // X軸のズレ
               const inXRange = Math.abs(b.mesh.position.x - zx) <= hitRadius;
 
               if (inZRange && inXRange) {
@@ -1535,28 +1621,44 @@
           }
         }
 
-        // --- 2. 【バグ完全解消】ゾンビ侵入＆ゲームオーバー処理 ---
+        // --- 2. ゾンビの移動＆アニメ更新（腕突き出し＆首かしげ徘徊） ---
         for (let i = zombies.length - 1; i >= 0; i--) {
           const z = zombies[i];
           z.mesh.position.z += z.speed;
           if (z.mixer) z.mixer.update(delta);
 
-          // 防衛ライン（DEFENSE_Z）到達時の確実なダメージ＆全滅処理
+          // ボーン直接制御で「不気味なゾンビ徘徊ポーズ」を維持
+          if (z.bones) {
+            const zSwing = Math.sin(gameTime * 4 + z.wobbleSeed) * 0.15;
+            if (z.bones.rightArm) z.bones.rightArm.rotation.set(-1.55 + zSwing, 0.1, 0.15);
+            if (z.bones.leftArm) z.bones.leftArm.rotation.set(-1.5 - zSwing, -0.1, -0.15);
+            if (z.bones.rightHand) z.bones.rightHand.rotation.set(0.55, 0, 0); // 手首ダラン
+            if (z.bones.leftHand) z.bones.leftHand.rotation.set(0.55, 0, 0);
+            if (z.bones.spine) z.bones.spine.rotation.set(0.35, 0, zSwing * 0.4); // 猫背＆横揺れ
+            if (z.bones.neck) z.bones.neck.rotation.set(0.15, zSwing * 0.8, 0.25); // 首かしげ
+          }
+
+          // 防衛ライン突入
           if (z.mesh.position.z >= DEFENSE_Z) {
             spawnMeatDebris(z.mesh.position.x, 0.6, z.mesh.position.z, 0xef4444, 15);
             scene.remove(z.mesh);
             zombies.splice(i, 1);
 
-            // タンクは3人、通常は1人倒す
             removeSquad(z.type === 'tank' ? 3 : 1);
-            if (!isPlaying) return; // 全滅時はゲームオーバーで即終了
+            if (!isPlaying) return;
           }
         }
 
-        // ボス防衛ライン到達
+        // ボス移動＆ゾンビ骨格更新
         if (boss) {
           boss.mesh.position.z += boss.speed;
           if (boss.mixer) boss.mixer.update(delta);
+
+          if (boss.bones) {
+            if (boss.bones.rightArm) boss.bones.rightArm.rotation.set(-1.45, 0.1, 0.1);
+            if (boss.bones.leftArm) boss.bones.leftArm.rotation.set(-1.4, -0.1, -0.1);
+            if (boss.bones.spine) boss.bones.spine.rotation.set(0.3, 0, 0);
+          }
 
           if (boss.mesh.position.z >= DEFENSE_Z - 1.5) {
             endGame(false);
