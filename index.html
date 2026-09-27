@@ -185,7 +185,7 @@ button{font-family:inherit;cursor:pointer;-webkit-appearance:none;appearance:non
       <div><b class="c-blue">青ゲート</b>で仲間が増える。撃つほど数値アップ</div>
       <div><b class="c-red">赤ゲート</b>は仲間が減る。撃ち続けると青に反転</div>
       <div><b class="c-gold">武器クレート</b>を拾うと武器が永久強化</div>
-      <div><b class="c-green">酸</b>や<b class="c-red">投石</b>の着弾マークから逃げろ。被弾でコンボ消滅</div>
+      <div><b class="c-green">酸</b>の着弾マークから逃げろ。被弾でコンボ消滅</div>
       <div>ボス撃破ごとに<b>特殊能力を1つ獲得</b>。階級を上げてハイスコアを狙え</div>
     </div>
     <div id="best-line" class="best"></div>
@@ -406,8 +406,10 @@ const bulletPool=[], flashPool=[], missilePool=[], rings=[], charPool={};
 let boss=null;
 const keys={left:false,right:false};
 const dmgMul=()=>1+0.2*(up.dmg-1);
-const hpMul=()=>Math.pow(HP_GROWTH,stage-1)*(1+Math.min(1,stageTime/60)*0.35);
-const HP_GROWTH=1.42, BOSS_GROWTH=1.52;
+// 難易度は「ステージ＋ステージ内の経過時間」で途切れず連続的に上がる
+const diff=()=>(stage-1)+Math.min(1,stageTime/45);
+const hpMul=()=>Math.pow(HP_GROWTH,diff());
+const HP_GROWTH=1.5, BOSS_GROWTH=1.58, SPAWN_ACCEL=0.92, COUNT_GROWTH=1.2, SPEED_GROWTH=0.09;
 const critChance=()=>0.12+0.06*up.crit;
 const blastR=()=>1.5*(1+0.2*up.blast);
 const bulletRange=()=>40+8*up.range;
@@ -1260,32 +1262,30 @@ function spawnZombie(type,x,z){
   c.root.position.set(x,0,z); c.root.scale.setScalar(CHAR_DEF[type].scale*rand(0.93,1.07));
   const bonus=type==='normal'?Math.min(2,0.3*st):(type==='runner'?Math.min(3,0.4*st):Math.min(1.5,0.2*st));
   const hp=d.hp*hpMul();
-  zombies.push({id:++zid,c,type,hp,maxHp:hp,speed:d.speed+bonus,r:d.r,kbMul:d.kb,kb:0,flash:0,seed:Math.random()*10,drift:rand(-0.4,0.4),t:0,dead:false,spit:rand(0.3,1.2)});
+  zombies.push({id:++zid,c,type,hp,maxHp:hp,speed:(d.speed+bonus)*(1+SPEED_GROWTH*diff()*(type==='runner'?0.5:1)),r:d.r,kbMul:d.kb,kb:0,flash:0,seed:Math.random()*10,drift:rand(-0.4,0.4),t:0,dead:false,spit:rand(0.3,1.2)});
 }
 function spawnWave(){
-  const st=stage, r=Math.random();
-  // 序盤の猶予：最初の10秒は少数の通常ゾンビのみ
-  if(st===1&&stageTime<10){
+  const d=diff(), r=Math.random(), ch=(p)=>Math.random()<p;
+  if(stage===1&&stageTime<8){
     const cx=rand(-2.4,2.4), n=2+Math.floor(Math.random()*2);
     for(let k=0;k<n;k++) spawnZombie('normal',clamp(cx+rand(-1,1),-LIM,LIM),-42-Math.random()*5);
     return;
   }
-  if(r<0.24){ // 両端からのランナー挟み撃ち
-    [-1,1].forEach(s=>spawnZombie('runner',s*rand(2.6,3.9),-42));
-    if(st>=3) [-1,1].forEach(s=>spawnZombie('runner',s*rand(1.2,3.9),-47));
-    if(st>=6) [-1,1].forEach(s=>spawnZombie('runner',s*rand(0.4,3.9),-52));
-  }else if(r<0.42){ // タンク＋随伴
+  if(r<0.22){ // 両端からのランナー
+    const pairs=1+Math.floor(d*0.35+Math.random()*0.6);
+    for(let k=0;k<Math.min(pairs,4);k++) [-1,1].forEach(s=>spawnZombie('runner',s*rand(Math.max(0.4,2.6-k*0.8),3.9),-42-k*5));
+  }else if(r<0.38){ // タンク＋随伴
     const lx=rand(-3.4,3.4);
     spawnZombie('tank',lx,-42); spawnZombie('runner',clamp(lx+rand(-0.5,0.5),-LIM,LIM),-46);
-    if(st>=4) spawnZombie('tank',clamp(-lx*0.8,-LIM,LIM),-49);
-  }else if(r<0.58&&st>=2){ // スピッター（端から酸を吐く）
-    const n=st>=5?2:1;
+    if(ch(clamp((d-1.5)*0.15,0,0.8))) spawnZombie('tank',clamp(-lx*0.8,-LIM,LIM),-49);
+  }else if(r<0.52&&d>=1){ // スピッター
+    const n=1+(ch(clamp((d-2.5)*0.15,0,0.7))?1:0);
     for(let k=0;k<n;k++){ const sx=(k%2?-1:1)*(Math.random()<0.5?-1:1)*rand(2.5,3.9); spawnZombie('spitter',sx,-43-k*3); spawnZombie('normal',clamp(sx+rand(-0.8,0.8),-LIM,LIM),-40-k*3); }
-  }else if(r<0.68&&st>=2){ // 横一列の大群
-    const rows=st>=5?2:1;
+  }else if(r<0.62&&d>=0.6){ // 横一列の大群
+    const rows=1+(ch(clamp((d-2)*0.2,0,0.9))?1:0);
     for(let row=0;row<rows;row++) for(let k=0;k<6;k++) spawnZombie('normal',-3.9+k*1.56,-43-row*4-Math.random()*1.5);
-  }else{ // 群れ（ステージが進むと左右に分かれて同時に来る）
-    const n=(st===1?3:4)+Math.floor(Math.random()*3)+Math.min(6,st-1), groups=(n>5||st>=3)?2:1;
+  }else{ // 群れ（数が増えると左右に分かれて同時に来る）
+    const n=Math.min(13,3+Math.floor(Math.random()*3)+Math.floor(d*COUNT_GROWTH)), groups=n>5?2:1;
     const side=Math.random()<0.5?-1:1;
     for(let gidx=0;gidx<groups;gidx++){
       const cx=groups===2?(gidx?-side:side)*rand(1.8,3.4):rand(-3.2,3.2);
@@ -1298,13 +1298,13 @@ function updateSpawning(dt){
   spawnTimer-=dt;
   if(spawnTimer<=0){
     spawnWave();
-    let iv=Math.max(stage>=4?0.36:0.45,0.9-stageTime*0.01-(stage-1)*0.06);
+    let iv=Math.max(0.3,1.0*Math.pow(SPAWN_ACCEL,diff()));
     if(boss) iv*=1.5;
     spawnTimer=iv;
   }
   if(!boss){ gateTimer-=dt; if(gateTimer<=0&&gates.length===0){ spawnGatePair(); gateTimer=10; } }
   crateTimer-=dt; if(crateTimer<=0&&crates.length===0){ spawnCrate(); crateTimer=13; }
-  if(stage>=3){ carTimer-=dt; if(carTimer<=0){ spawnCar(); carTimer=rand(7,10)-Math.min(3,(stage-3)*0.4); } }
+  if(stage>=3){ carTimer-=dt; if(carTimer<=0){ spawnCar(); carTimer=rand(8,11)*Math.pow(0.95,diff()-2); } }
   if(!boss&&!bossSpawned&&(stageTime>42||stageKills>=75+15*(stage-1))) spawnBoss();
 }
 function damageZombie(z,d,crit,showNum){
@@ -1353,7 +1353,7 @@ function updateZombies(dt){
     z.c.root.rotation.y=Math.PI+vx*0.12;
     if(z.type==='spitter'&&p.z>-32&&p.z<DEFENSE_Z-11){
       z.spit-=dt;
-      if(z.spit<=0){ z.spit=rand(2.2,3.0)-Math.min(1,(stage-2)*0.12); spawnHazard('acid',p.x,p.z,leaderX,1.2,0.95,1); }
+      if(z.spit<=0){ z.spit=rand(2.4,3.2); spawnHazard('acid',p.x,p.z,leaderX,1.2,0.95,1); }
     }
     if(z.flash>0){ z.flash=Math.max(0,z.flash-dt*14); setCharFlash(z.c,z.flash); }
     if(z.c.mixer) z.c.mixer.update(dt); else animZombie(z.c,dt,z.type);
@@ -1473,14 +1473,12 @@ function updateBoss(dt){
   b.stompT-=dt; if(b.stompT<=0){ b.stompT=b.enraged?0.55:0.8; if(p.z>-30) shake=Math.max(shake,0.2); }
   b.summon-=dt;
   if(b.summon<=0&&p.z<DEFENSE_Z-12){
-    b.summon=b.enraged?3.2:5;
+    b.summon=(b.enraged?3.2:5)*Math.pow(0.95,stage-1);
     spawnZombie('runner',clamp(p.x-1.6,-LIM,LIM),p.z+2.5); spawnZombie('runner',clamp(p.x+1.6,-LIM,LIM),p.z+2.5);
     if(stage>=2) spawnZombie('spitter',clamp(p.x+(Math.random()<0.5?-3:3),-LIM,LIM),p.z+1);
   }
   // 投石：プレイヤーの現在位置を狙って連投（止まっていると当たる）
-  b.rock-=dt;
-  if(b.rock<=0&&p.z<DEFENSE_Z-10){ b.rock=(b.enraged?3.1:4.4)-Math.min(1.2,(stage-1)*0.15); b.volley=Math.min(3,1+Math.floor((stage-1)/3))+(b.enraged&&stage>=3?1:0); b.volleyT=0; }
-  if(b.volley>0){ b.volleyT-=dt; if(b.volleyT<=0){ b.volley--; b.volleyT=0.42; spawnHazard('rock',p.x,p.z+1,leaderX,1.3,1.25,stage>=6?2:1); } }
+
   if(p.z>=DEFENSE_Z-2.2){
     hurtSquad(3); p.z-=14; b.kb=0; shake=1.4; Sound.play('bigboom');
     bloodBurst(leaderX,0.8,DEFENSE_Z,20,true);
@@ -1508,10 +1506,6 @@ function onBossDefeated(){
 const THREATS={
   2:'⚠ NEW：スピッター ─ 緑の着弾マークから逃げろ',
   3:'⚠ NEW：炎上車両 ─ 撃って破壊するか、避けろ',
-  4:'⚠ タンクが2体で進軍・ボスの投石が2連投に',
-  7:'⚠ ボスの投石が3連投に',
-  5:'⚠ 大群が2列で押し寄せる',
-  6:'⚠ ランナーが6体で襲来'
 };
 function nextStage(){
   const oldRank=rankFor(stage);
@@ -1520,7 +1514,7 @@ function nextStage(){
   shieldLeft=up.shield; updateChips();
   if(stage%2===1) setPalette(Math.floor((stage-1)/2));
   const nr=rankFor(stage);
-  showStageBanner('STAGE '+stage,THREATS[stage]||('敵の耐久 x'+hpMul().toFixed(1)+' ─ まだ終わらない'));
+  showStageBanner('STAGE '+stage,THREATS[stage]||('敵の耐久 x'+hpMul().toFixed(1)+' ─ 数も増えていく'));
   if(nr!==oldRank) setTimeout(()=>{ if(running) showBanner('🎖 昇進！ '+nr,'linear-gradient(90deg,#a16207,#facc15)'); },1200);
 }
 
