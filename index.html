@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Z-OUTBREAK: SPECIAL FORCES</title>
+  <title>DEAD BRIDGE: HORDE INVASION</title>
   <style>
     * {
       box-sizing: border-box;
@@ -44,7 +44,7 @@
       transition: box-shadow 0.15s;
     }
     #vignette.hit {
-      box-shadow: inset 0 0 90px rgba(220, 38, 38, 0.9), inset 0 0 180px rgba(185, 28, 28, 0.8);
+      box-shadow: inset 0 0 100px rgba(220, 38, 38, 0.95), inset 0 0 200px rgba(185, 28, 28, 0.85);
     }
 
     /* HUD */
@@ -79,6 +79,31 @@
     #squad-val { font-size: 20px; color: #38bdf8; text-shadow: 0 0 8px rgba(56, 189, 248, 0.5); }
     #score-val { font-size: 20px; color: #facc15; text-shadow: 0 0 8px rgba(250, 204, 21, 0.5); }
 
+    /* ホード警告インジケーター */
+    #horde-warning {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 14px) + 52px);
+      left: 50%;
+      transform: translateX(-50%) scale(0.8);
+      padding: 6px 20px;
+      background: rgba(185, 28, 28, 0.9);
+      border: 2px solid #ef4444;
+      border-radius: 20px;
+      color: #fff;
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing: 2px;
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+      display: none;
+      z-index: 15;
+      animation: alertPulse 0.5s infinite alternate;
+      pointer-events: none;
+    }
+    @keyframes alertPulse {
+      from { transform: translateX(-50%) scale(0.95); opacity: 0.8; }
+      to { transform: translateX(-50%) scale(1.08); opacity: 1; }
+    }
+
     /* ボスHUD */
     #boss-hud {
       position: absolute;
@@ -100,11 +125,6 @@
       letter-spacing: 2px;
       margin-bottom: 4px;
       text-shadow: 0 2px 4px rgba(0,0,0,0.9);
-      animation: pulseAlert 0.8s infinite alternate;
-    }
-    @keyframes pulseAlert {
-      from { transform: scale(1); opacity: 0.85; }
-      to { transform: scale(1.05); opacity: 1; }
     }
     .boss-bar-wrap {
       width: 100%;
@@ -263,6 +283,7 @@
 <body>
   <div id="game-container">
     <div id="vignette"></div>
+    <div id="horde-warning">⚠ MASSIVE HORDE DETECTED ⚠</div>
     <div id="error-box"></div>
     <div id="damage-layer"></div>
 
@@ -279,7 +300,7 @@
 
     <!-- ボスHUD -->
     <div id="boss-hud">
-      <div id="boss-label">⚠ TARGET: MUTANT GOLIATH ⚠</div>
+      <div id="boss-label">⚠ WARNING: MUTANT GOLIATH ⚠</div>
       <div class="boss-bar-wrap">
         <div id="boss-bar-fill"></div>
       </div>
@@ -293,12 +314,12 @@
 
     <!-- スタート画面 -->
     <div id="start-screen" class="screen-overlay">
-      <h1 class="screen-title">Z-OUTBREAK: FIRING LINE</h1>
+      <h1 class="screen-title">DEAD BRIDGE: HORDE RUSH</h1>
       <p id="start-subtext" class="screen-desc">
-        <b>【特殊部隊 VS ゾンビ大群・迎撃戦】</b><br>
-        アサルトライフルを両手で構え、迫り来る<b>ゾンビの大群</b>を撃滅せよ！<br>
-        ゲートを撃ち抜いて射撃部隊を増やし、反動に耐えて弾幕を張れ。<br>
-        防衛ラインを突破されると全滅する。死守せよ！
+        <b>【新仕様：弾丸貫通＆ゾンビ津波】</b><br>
+        弾は<b>壁を通り抜けて奥のゾンビをそのまま撃ち抜く</b>！<br>
+        青壁を通った弾は威力倍増の超貫通弾へ覚醒！<br>
+        超高速ランナーと有毒自爆ゾンビを最優先で迎撃せよ。
       </p>
 
       <div id="loading-box">
@@ -308,7 +329,7 @@
         </div>
       </div>
 
-      <button id="start-btn" class="btn-main" style="display: none; margin-top: 15px;">COMMENCE ENGAGEMENT</button>
+      <button id="start-btn" class="btn-main" style="display: none; margin-top: 15px;">START DEFENSE</button>
     </div>
 
     <!-- リザルト画面 -->
@@ -419,6 +440,18 @@
           gain.connect(audioCtx.destination);
           osc.start(now);
           osc.stop(now + 0.07);
+        } else if (type === 'gate_boost') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(520, now);
+          osc.frequency.exponentialRampToValueAtTime(1040, now + 0.12);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.linearRampToValueAtTime(0.001, now + 0.12);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.12);
         } else if (type === 'explosion') {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
@@ -455,6 +488,7 @@
     let score = 0;
     let gameTime = 0;
     let spawnTimer = 0;
+    let hordeTimer = 12.0; // 定期的に大群が津波のように押し寄せる
     let gateTimer = 0;
     let shakeIntensity = 0;
 
@@ -550,7 +584,7 @@
       ctx.fillStyle = '#cbd5e1';
       ctx.font = 'bold 24px -apple-system, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(isPos ? 'AIR-DROP' : 'HAZARD', 128, 50);
+      ctx.fillText(isPos ? 'PIERCE-AMP' : 'HAZARD', 128, 50);
 
       ctx.fillStyle = '#ffffff';
       ctx.font = '900 84px Impact, sans-serif';
@@ -560,55 +594,51 @@
       return new THREE.CanvasTexture(cvs);
     }
 
-    function createTracerTexture() {
+    function createTracerTexture(isAmp = false) {
       const cvs = document.createElement('canvas');
       cvs.width = 64; cvs.height = 256;
       const ctx = cvs.getContext('2d');
 
       const grad = ctx.createLinearGradient(0, 0, 0, 256);
-      grad.addColorStop(0, '#ffffff');
-      grad.addColorStop(0.2, '#fef08a');
-      grad.addColorStop(0.6, '#f97316');
-      grad.addColorStop(1.0, 'rgba(239, 68, 68, 0)');
+      if (isAmp) {
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.2, '#38bdf8');
+        grad.addColorStop(0.6, '#0284c7');
+        grad.addColorStop(1.0, 'rgba(2, 132, 199, 0)');
+      } else {
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.2, '#fef08a');
+        grad.addColorStop(0.6, '#f97316');
+        grad.addColorStop(1.0, 'rgba(239, 68, 68, 0)');
+      }
 
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 64, 256);
       return new THREE.CanvasTexture(cvs);
     }
 
-    // --- 特殊部隊用タクティカルアタッチメント ---
+    // --- 特殊部隊ライフル & 4眼暗視ゴーグル ---
     function createSpecialForcesRifle() {
       const gun = new THREE.Group();
       const gunMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.3, metalness: 0.85 });
-
-      // レシーバー本体
       const body = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.65), gunMat);
-      // サプレッサー（銃口消音器）
       const suppressor = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.3, 8), gunMat);
       suppressor.rotation.x = Math.PI / 2;
       suppressor.position.set(0, 0.02, -0.45);
-      // マガジン
       const mag = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.22, 0.1), gunMat);
       mag.position.set(0, -0.12, -0.05);
-      // ホロサイト（光学照準器）
       const sight = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.14), gunMat);
       sight.position.set(0, 0.09, -0.05);
-      // フォアグリップ
-      const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.15, 6), gunMat);
-      grip.position.set(0, -0.1, -0.25);
-
-      gun.add(body, suppressor, mag, sight, grip);
+      gun.add(body, suppressor, mag, sight);
       gun.position.set(0.18, 1.02, -0.42);
       gun.castShadow = true;
       return gun;
     }
 
-    // 4眼式ナイトビジョン（GPNVG-18）
     function createGPNVG18() {
       const nvg = new THREE.Group();
       const mountMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.5 });
-      const lensMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 }); // 青白く光る4つのレンズ
-
+      const lensMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
       const base = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.06, 0.08), mountMat);
       for (let i = -1.5; i <= 1.5; i += 1.0) {
         const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.1, 8), lensMat);
@@ -621,31 +651,33 @@
       return nvg;
     }
 
-    // --- ゾンビ専用アタッチメント（血走った眼球・牙・血糊） ---
-    function createZombieFaceGore(scale = 1.0) {
+    function createZombieFaceGore(type = 'normal') {
       const gore = new THREE.Group();
-      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0022 }); // 爛々と光る赤眼
-      const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.045 * scale, 8, 8), eyeMat);
-      eyeL.position.set(-0.08 * scale, 1.48 * scale, 0.22 * scale);
+      const isBoomer = type === 'boomer';
+      const eyeMat = new THREE.MeshBasicMaterial({ color: isBoomer ? 0x22c55e : 0xff0022 });
+      const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), eyeMat);
+      eyeL.position.set(-0.08, 1.48, 0.22);
       const eyeR = eyeL.clone();
-      eyeR.position.x = 0.08 * scale;
+      eyeR.position.x = 0.08;
 
-      // 裂けた口・露出した歯
       const mouthMat = new THREE.MeshStandardMaterial({ color: 0x7f1d1d, roughness: 0.6 });
-      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.16 * scale, 0.06 * scale, 0.06 * scale), mouthMat);
-      mouth.position.set(0, 1.34 * scale, 0.22 * scale);
+      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.06), mouthMat);
+      mouth.position.set(0, 1.34, 0.22);
 
-      // 肩の露出した骨・変異腫瘍
-      const boneMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.4 });
-      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.06 * scale, 0.25 * scale, 5), boneMat);
-      spike.rotation.z = Math.PI / 4;
-      spike.position.set(-0.35 * scale, 1.35 * scale, 0);
+      if (isBoomer) {
+        // 自爆ゾンビの背中・腹部の有毒腫瘍（緑色発光）
+        const tumorMat = new THREE.MeshBasicMaterial({ color: 0x4ade80 });
+        const tumor1 = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), tumorMat);
+        tumor1.position.set(0.15, 1.1, 0.25);
+        const tumor2 = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), tumorMat);
+        tumor2.position.set(-0.1, 1.25, -0.2);
+        gore.add(tumor1, tumor2);
+      }
 
-      gore.add(eyeL, eyeR, mouth, spike);
+      gore.add(eyeL, eyeR, mouth);
       return gore;
     }
 
-    // --- ボーン探索ユーティリティ ---
     function extractBones(model) {
       const bones = {};
       model.traverse(child => {
@@ -666,13 +698,11 @@
     }
 
     // --- キャラクター生成 ---
-    // 1. 味方（両手でライフルを構え、4眼NVGを装着した特殊部隊）
     function spawnSpecialForcesInstance(isLeader = false) {
       const model = THREE.SkeletonUtils.clone(baseSoldierModel);
       model.scale.set(1.15, 1.15, 1.15);
 
       const mixer = new THREE.AnimationMixer(model);
-      // animations[0] (Idle) をベースに固定
       const action = mixer.clipAction(soldierAnimations[0]);
       action.play();
 
@@ -681,12 +711,11 @@
           child.castShadow = true;
           child.receiveShadow = true;
           child.material = child.material.clone();
-          child.material.color.setHex(isLeader ? 0x1e3a8a : 0x334155); // ネイビーシールズ・ダーク迷彩
+          child.material.color.setHex(isLeader ? 0x1e3a8a : 0x334155);
           child.material.roughness = 0.7;
         }
       });
 
-      // アサルトライフル ＆ 4眼ナイトビジョンを直接装備
       const rifle = createSpecialForcesRifle();
       const nvg = createGPNVG18();
       model.add(rifle, nvg);
@@ -695,22 +724,22 @@
       return { model, mixer, bones, rifle };
     }
 
-    // 2. 敵（腕を前に突き出し、首を傾げてフラフラ歩く本物のゾンビ）
     function spawnZombieInstance(type = 'normal') {
       const model = THREE.SkeletonUtils.clone(baseSoldierModel);
       let scale = 1.15;
       if (type === 'runner') scale = 0.95;
       if (type === 'tank') scale = 1.95;
+      if (type === 'boomer') scale = 1.3;
 
       model.scale.set(scale, scale, scale);
 
       const mixer = new THREE.AnimationMixer(model);
       let clip = soldierAnimations[3] || soldierAnimations[0]; // Walk
-      let animSpeed = 0.85;
+      let animSpeed = 0.9;
 
       if (type === 'runner') {
-        clip = soldierAnimations[1]; // Run（猛ダッシュ）
-        animSpeed = 1.45;
+        clip = soldierAnimations[1]; // Run（猛ダッシュ！）
+        animSpeed = 1.7;
       }
       const action = mixer.clipAction(clip);
       action.timeScale = animSpeed;
@@ -723,9 +752,10 @@
           child.receiveShadow = true;
           child.material = child.material.clone();
 
-          // 腐敗皮膚カラー（血染めランナー、黒変異タンク、緑腐敗ウォーカー）
-          if (type === 'runner') child.material.color.setHex(0x7f1d1d);
-          else if (type === 'tank') child.material.color.setHex(0x18181b);
+          if (type === 'runner') child.material.color.setHex(0x7f1d1d); // 血塗れ
+          else if (type === 'tank') child.material.color.setHex(0x18181b); // 黒変異
+          else if (type === 'armored') child.material.color.setHex(0x334155); // 防弾ベスト
+          else if (type === 'boomer') child.material.color.setHex(0x14532d); // 有毒グリーン
           else child.material.color.setHex(0x3f5545);
 
           child.material.roughness = 0.9;
@@ -733,17 +763,15 @@
         }
       });
 
-      // 顔に血走った眼球・牙・血糊スプラッターをアタッチ
-      const faceGore = createZombieFaceGore(1.0);
+      const faceGore = createZombieFaceGore(type);
       model.add(faceGore);
 
-      model.rotation.y = Math.PI; // 正面（プレイヤー側）へ向ける
+      model.rotation.y = Math.PI;
       const bones = extractBones(model);
 
       return { model, mixer, bones, mats, scale };
     }
 
-    // 3. 巨大変異体ボス（GOLIATH）
     function spawnGoliathBossInstance() {
       const model = THREE.SkeletonUtils.clone(baseSoldierModel);
       const scale = 3.6;
@@ -752,7 +780,7 @@
       const mixer = new THREE.AnimationMixer(model);
       const clip = soldierAnimations[3] || soldierAnimations[0];
       const action = mixer.clipAction(clip);
-      action.timeScale = 0.5;
+      action.timeScale = 0.65;
       action.play();
 
       const mats = [];
@@ -761,18 +789,17 @@
           child.castShadow = true;
           child.receiveShadow = true;
           child.material = child.material.clone();
-          child.material.color.setHex(0x310a0a); // ドス黒い変異筋肉
+          child.material.color.setHex(0x310a0a);
           child.material.roughness = 0.9;
           mats.push(child.material);
         }
       });
 
-      // 脈打つ変異心臓コア
       const core = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), new THREE.MeshBasicMaterial({ color: 0xff0044 }));
       core.position.set(0, 1.25, 0.2);
       model.add(core);
 
-      const faceGore = createZombieFaceGore(1.2);
+      const faceGore = createZombieFaceGore('normal');
       model.add(faceGore);
 
       model.rotation.y = Math.PI;
@@ -782,7 +809,8 @@
     }
 
     // --- 初期セットアップ ---
-    let tracerTexture = null;
+    let tracerTextureNormal = null;
+    let tracerTextureAmp = null;
 
     function init() {
       const container = document.getElementById('game-container');
@@ -806,7 +834,8 @@
       renderer.toneMappingExposure = 1.25;
       container.appendChild(renderer.domElement);
 
-      tracerTexture = createTracerTexture();
+      tracerTextureNormal = createTracerTexture(false);
+      tracerTextureAmp = createTracerTexture(true);
 
       // ライティング
       const hemiLight = new THREE.HemisphereLight(0xbae6fd, 0x0284c7, 0.75);
@@ -1020,7 +1049,7 @@
 
     function removeSquad(cnt) {
       playSfx('splat');
-      shakeIntensity = 0.5;
+      shakeIntensity = 0.55;
 
       const vig = document.getElementById('vignette');
       vig.classList.add('hit');
@@ -1047,8 +1076,8 @@
       const w = BRIDGE_WIDTH / 2 - 0.35;
       const leftGood = Math.random() < 0.5;
 
-      const g1 = createMilGate(leftGood ? 6 : -4, leftGood, -w / 2 - 0.15, z, w);
-      const g2 = createMilGate(!leftGood ? 6 : -4, !leftGood, w / 2 + 0.15, z, w);
+      const g1 = createMilGate(leftGood ? 6 : -5, leftGood, -w / 2 - 0.15, z, w);
+      const g2 = createMilGate(!leftGood ? 6 : -5, !leftGood, w / 2 + 0.15, z, w);
       gates.push(g1, g2);
     }
 
@@ -1056,7 +1085,7 @@
       const g = new THREE.Group();
       const panel = new THREE.Mesh(
         new THREE.PlaneGeometry(width, 2.8),
-        new THREE.MeshBasicMaterial({ transparent: true, side: THREE.DoubleSide })
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85, side: THREE.DoubleSide })
       );
       panel.position.y = 1.5;
       g.add(panel);
@@ -1146,8 +1175,8 @@
           for (let i = zombies.length - 1; i >= 0; i--) {
             const z = zombies[i];
             if (Math.abs(z.mesh.position.z - boomZ) < 6.5) {
-              z.hp -= 30;
-              showDamageNumber(30, z.mesh.position.x, 1, z.mesh.position.z, true);
+              z.hp -= 35;
+              showDamageNumber(35, z.mesh.position.x, 1, z.mesh.position.z, true);
               if (z.hp <= 0) {
                 spawnMeatDebris(z.mesh.position.x, 0.7, z.mesh.position.z, 0xef4444, 15);
                 scene.remove(z.mesh);
@@ -1159,8 +1188,8 @@
           }
 
           if (boss && Math.abs(boss.mesh.position.z - boomZ) < 8.0) {
-            boss.hp -= 25;
-            showDamageNumber(25, boss.mesh.position.x, 2.5, boss.mesh.position.z, true);
+            boss.hp -= 35;
+            showDamageNumber(35, boss.mesh.position.x, 2.5, boss.mesh.position.z, true);
             updateBossHp();
           }
         }, k * 110);
@@ -1209,6 +1238,7 @@
       score = 0;
       gameTime = 0;
       spawnTimer = 0;
+      hordeTimer = 10.0;
       gateTimer = 1.0;
       shakeIntensity = 0;
       ultGauge = 0;
@@ -1216,7 +1246,6 @@
       playerLeaderX = 0;
       targetX = 0;
 
-      // 特殊部隊リーダーの出撃（銃構えエイム姿勢）
       const leader = spawnSpecialForcesInstance(true);
       leader.model.position.set(0, 0, DEFENSE_Z);
       scene.add(leader.model);
@@ -1234,6 +1263,7 @@
       updateUltUi();
       document.getElementById('score-val').innerText = '0';
       document.getElementById('boss-hud').style.display = 'none';
+      document.getElementById('horde-warning').style.display = 'none';
 
       isPlaying = true;
     }
@@ -1346,14 +1376,14 @@
 
         playerLeaderX += (targetX - playerLeaderX) * 0.22;
 
-        // --- 味方特殊部隊の更新（両手エイム姿勢＆射撃リコイル） ---
+        // 特殊部隊の更新（リコイル＆照準維持）
         squadMembers.forEach(m => {
           if (m.recoil > 0) {
             m.recoil -= delta * 12;
             if (m.recoil < 0) m.recoil = 0;
           }
 
-          const recoilZ = m.recoil * 0.14; // 撃つたびに後方に反動キックバック
+          const recoilZ = m.recoil * 0.14;
           const recoilRotX = -m.recoil * 0.08;
 
           m.mesh.position.x += (playerLeaderX + m.offsetX - m.mesh.position.x) * 0.25;
@@ -1362,42 +1392,37 @@
 
           if (m.mixer) m.mixer.update(delta);
 
-          // ボーンを直接プログラマティック制御（両手でライフルを構える姿勢）
           if (m.bones) {
             if (m.bones.rightArm) m.bones.rightArm.rotation.set(-1.25, 0.45, 0.2 + m.recoil * 0.15);
             if (m.bones.rightForeArm) m.bones.rightForeArm.rotation.set(0, 0, 1.35);
             if (m.bones.leftArm) m.bones.leftArm.rotation.set(-1.05, -0.55, -0.2);
             if (m.bones.leftForeArm) m.bones.leftForeArm.rotation.set(0, 0, -1.2);
-            if (m.bones.head) m.bones.head.rotation.set(0.12, 0, 0); // 照準を真っ直ぐ睨む
+            if (m.bones.head) m.bones.head.rotation.set(0.12, 0, 0);
           }
         });
 
-        // フルオート射撃ロジック
+        // 射撃処理
         shootCool -= delta;
-        const cooldown = 0.13;
         if (shootCool <= 0) {
-          shootCool = cooldown;
+          shootCool = 0.12;
           playSfx('rifle');
 
           muzzleLight.position.set(playerLeaderX, 1.2, DEFENSE_Z - 0.8);
           muzzleLight.intensity = 2.8;
 
           squadMembers.forEach(m => {
-            m.recoil = 1.0; // 反動トリガー
-
-            // 銃口の正確な3D位置
+            m.recoil = 1.0;
             const muzzleX = m.mesh.position.x + 0.22;
             const muzzleY = 1.05;
             const muzzleZ = m.mesh.position.z - 0.85;
 
-            // マズルフラッシュ
             spawnMuzzleFlash(muzzleX, muzzleY, muzzleZ);
 
-            // 超音速曳光弾（トレーサー弾）
+            // 超音速曳光弾
             const tracerGeo = new THREE.CylinderGeometry(0.035, 0.05, 1.4, 6);
             tracerGeo.rotateX(Math.PI / 2);
             const tracerMat = new THREE.MeshBasicMaterial({
-              map: tracerTexture,
+              map: tracerTextureNormal,
               transparent: true,
               opacity: 0.95
             });
@@ -1407,13 +1432,14 @@
 
             bullets.push({
               mesh: tracer,
-              vz: -1.35,
+              vz: -1.4,
               vx: (Math.random() - 0.5) * 0.02,
+              damage: 1,
               penetration: 2,
-              prevZ: muzzleZ - 0.7
+              prevZ: muzzleZ - 0.7,
+              passedGates: new Set()
             });
 
-            // 薬莢エジェクション
             spawnCasing(muzzleX + 0.15, muzzleY, muzzleZ + 0.35);
           });
         }
@@ -1428,20 +1454,61 @@
           }
         }
 
+        // ゲートスポーン
         gateTimer -= delta;
         if (gateTimer <= 0 && gates.length === 0 && !boss) {
           spawnGatePair();
-          gateTimer = 8.5;
+          gateTimer = 8.0;
         }
 
-        // ゾンビ大群スポーン
+        // --- 難易度強化：定期的な大群津波（MASSIVE HORDE） ---
+        hordeTimer -= delta;
+        if (hordeTimer <= 0 && !boss) {
+          hordeTimer = 14.0;
+          document.getElementById('horde-warning').style.display = 'block';
+          setTimeout(() => { document.getElementById('horde-warning').style.display = 'none'; }, 2200);
+          playSfx('explosion');
+
+          // 横一列に10〜12体のゾンビが一斉に押し寄せる！
+          for (let h = 0; h < 12; h++) {
+            const laneX = -BRIDGE_WIDTH / 2 + 0.8 + (h * (BRIDGE_WIDTH - 1.6) / 11);
+            const zOff = -70 - (Math.random() * 6);
+            const type = Math.random() < 0.35 ? 'runner' : (Math.random() < 0.2 ? 'armored' : 'normal');
+
+            const zObj = spawnZombieInstance(type);
+            zObj.model.position.set(laneX, 0, zOff);
+            scene.add(zObj.model);
+
+            let hp = type === 'armored' ? 6 : (type === 'runner' ? 2 : 3);
+            let spd = type === 'runner' ? 0.24 : 0.11;
+
+            zombies.push({
+              mesh: zObj.model,
+              mixer: zObj.mixer,
+              bones: zObj.bones,
+              mats: zObj.mats,
+              hp,
+              type,
+              speed: spd,
+              wobbleSeed: Math.random() * 10
+            });
+          }
+        }
+
+        // 通常ゾンビ小隊スポーン（徐々にスポーン頻度上昇）
         spawnTimer -= delta;
         if (spawnTimer <= 0 && !boss) {
-          const hordeCount = Math.floor(Math.random() * 3) + 3;
+          const hordeCount = Math.floor(Math.random() * 3) + 4; // 4〜6体同時
 
           for (let k = 0; k < hordeCount; k++) {
-            const types = ['normal', 'normal', 'normal', 'runner', 'tank'];
-            const type = types[Math.floor(Math.random() * types.length)];
+            // 4大タイプ
+            const rand = Math.random();
+            let type = 'normal';
+            if (rand < 0.28) type = 'runner'; // 超高速
+            else if (rand < 0.48) type = 'armored'; // 重装甲
+            else if (rand < 0.62) type = 'boomer'; // 自爆有毒
+            else type = 'normal';
+
             const x = (Math.random() - 0.5) * (BRIDGE_WIDTH - 1.5);
             const zOffset = -65 - Math.random() * 8;
 
@@ -1450,9 +1517,18 @@
             scene.add(zObj.model);
 
             let hp = 3;
-            let spd = 0.09 + Math.random() * 0.02;
-            if (type === 'runner') { hp = 2; spd = 0.18 + Math.random() * 0.03; }
-            if (type === 'tank') { hp = 15; spd = 0.045; }
+            let spd = 0.10 + Math.random() * 0.02;
+
+            if (type === 'runner') {
+              hp = 2;
+              spd = 0.25; // 狂暴ダッシュ！
+            } else if (type === 'armored') {
+              hp = 8; // 防弾タフ
+              spd = 0.08;
+            } else if (type === 'boomer') {
+              hp = 4;
+              spd = 0.12;
+            }
 
             zombies.push({
               mesh: zObj.model,
@@ -1466,11 +1542,11 @@
             });
           }
 
-          spawnTimer = Math.max(0.35, 1.1 - gameTime * 0.015);
+          spawnTimer = Math.max(0.3, 0.95 - gameTime * 0.015);
         }
 
-        // ボス出現
-        if (!boss && (gameTime > 42 || score >= 180)) {
+        // ボス出現（40秒経過またはスコア到達）
+        if (!boss && (gameTime > 40 || score >= 160)) {
           const bObj = spawnGoliathBossInstance();
           bObj.model.position.set(0, 0, -75);
           scene.add(bObj.model);
@@ -1480,16 +1556,17 @@
             mixer: bObj.mixer,
             bones: bObj.bones,
             mats: bObj.mats,
-            hp: 300,
-            maxHp: 300,
-            speed: 0.024
+            hp: 450,
+            maxHp: 450,
+            speed: 0.028,
+            roarTimer: 3.5
           };
           document.getElementById('boss-hud').style.display = 'flex';
-          shakeIntensity = 0.8;
-          playSfx('splat');
+          shakeIntensity = 1.0;
+          playSfx('explosion');
         }
 
-        // --- 1. スウィープ線分衝突判定 ---
+        // --- 1. 【要件実現】弾丸の移動＆壁貫通＆ゾンビ着弾判定 ---
         for (let i = bullets.length - 1; i >= 0; i--) {
           const b = bullets[i];
           const oldZ = b.prevZ !== undefined ? b.prevZ : b.mesh.position.z;
@@ -1504,81 +1581,109 @@
             continue;
           }
 
-          let hit = false;
-
-          // ゲート交差判定
+          // A. 壁（ゲート）の通り抜け判定：弾は絶対に消滅しない！
           for (let g of gates) {
             const gz = g.mesh.position.z;
-            if (oldZ >= gz - 0.4 && newZ <= gz + 0.4) {
+            if (oldZ >= gz - 0.5 && newZ <= gz + 0.5) {
               if (Math.abs(b.mesh.position.x - g.mesh.position.x) < g.width / 2) {
-                hit = true;
-                if (g.isPos) {
-                  g.val = Math.min(30, g.val + 1);
-                  updateGateTexture(g);
-                  spawnMeatDebris(b.mesh.position.x, 1.5, gz, 0x38bdf8, 3);
-                } else {
-                  g.val = Math.min(0, g.val + 1);
-                  updateGateTexture(g);
-                  spawnMeatDebris(b.mesh.position.x, 1.5, gz, 0xef4444, 3);
-                  if (g.val >= 0) {
-                    playSfx('explosion');
-                    spawnExplosionSmoke(g.mesh.position.x, 1.5, gz, 20);
-                    scene.remove(g.mesh);
-                    gates.splice(gates.indexOf(g), 1);
+                if (!b.passedGates.has(g)) {
+                  b.passedGates.add(g);
+
+                  if (g.isPos) {
+                    // 青壁通過：弾が通り抜けて超強化！ゲートも育つ！
+                    g.val = Math.min(35, g.val + 1);
+                    updateGateTexture(g);
+                    playSfx('gate_boost');
+
+                    // 弾の威力が2倍＆貫通数増加、青白く発光するトレーサーへ変化！
+                    b.damage = 2;
+                    b.penetration += 3;
+                    b.mesh.material.map = tracerTextureAmp;
+                    b.mesh.material.needsUpdate = true;
+                    b.mesh.scale.set(1.4, 1.4, 1.4);
+
+                    spawnMeatDebris(b.mesh.position.x, 1.5, gz, 0x38bdf8, 4);
+                  } else {
+                    // 赤壁通過：弾の威力が減少
+                    b.damage = 1;
+                    spawnMeatDebris(b.mesh.position.x, 1.5, gz, 0xef4444, 3);
                   }
                 }
-                break;
               }
             }
           }
 
-          // ゾンビ衝突判定
-          if (!hit) {
-            for (let j = zombies.length - 1; j >= 0; j--) {
-              const z = zombies[j];
-              const zx = z.mesh.position.x;
-              const zz = z.mesh.position.z;
-              const hitRadius = z.type === 'tank' ? 1.5 : 0.95;
+          // B. ゾンビ衝突判定（壁を通り抜けた弾がそのまま奥のゾンビをミンチにする！）
+          let bulletRemoved = false;
+          for (let j = zombies.length - 1; j >= 0; j--) {
+            const z = zombies[j];
+            const zx = z.mesh.position.x;
+            const zz = z.mesh.position.z;
+            const hitRadius = z.type === 'tank' ? 1.5 : (z.type === 'boomer' ? 1.2 : 0.95);
 
-              const inZRange = (oldZ >= zz - hitRadius) && (newZ <= zz + hitRadius);
-              const inXRange = Math.abs(b.mesh.position.x - zx) <= hitRadius;
+            const inZRange = (oldZ >= zz - hitRadius) && (newZ <= zz + hitRadius);
+            const inXRange = Math.abs(b.mesh.position.x - zx) <= hitRadius;
 
-              if (inZRange && inXRange) {
-                const isCrit = Math.random() < 0.25;
-                const dmg = isCrit ? 3 : 1;
-                z.hp -= dmg;
-                b.penetration--;
-                if (b.penetration <= 0) hit = true;
+            if (inZRange && inXRange) {
+              const isCrit = Math.random() < 0.25;
+              const dmg = (isCrit ? 3 : 1) * b.damage;
+              z.hp -= dmg;
+              b.penetration--;
 
-                chargeUlt(1.5);
-                playSfx('splat');
-                showDamageNumber(dmg, zx, 1.2, zz, isCrit);
-                spawnMeatDebris(zx, 0.7, zz, 0x5a7d65, 4);
+              chargeUlt(1.5);
+              playSfx('splat');
+              showDamageNumber(dmg, zx, 1.2, zz, isCrit || b.damage > 1);
+              spawnMeatDebris(zx, 0.7, zz, z.type === 'boomer' ? 0x22c55e : 0x5a7d65, 4);
 
-                // ヒットフラッシュ
-                if (z.mats && z.mats.length > 0) {
-                  z.mats.forEach(mat => mat.emissive && mat.emissive.setHex(0xffffff));
-                  setTimeout(() => {
-                    z.mats.forEach(mat => mat.emissive && mat.emissive.setHex(0x000000));
-                  }, 60);
-                }
+              // 白ヒットフラッシュ
+              if (z.mats && z.mats.length > 0) {
+                z.mats.forEach(mat => mat.emissive && mat.emissive.setHex(0xffffff));
+                setTimeout(() => {
+                  z.mats.forEach(mat => mat.emissive && mat.emissive.setHex(0x000000));
+                }, 60);
+              }
 
-                z.mesh.position.z -= 0.22; // ノックバック
+              z.mesh.position.z -= 0.18; // ノックバック
 
-                if (z.hp <= 0) {
+              // ゾンビ撃破判定
+              if (z.hp <= 0) {
+                if (z.type === 'boomer') {
+                  // 自爆ゾンビ破裂（周囲のゾンビを巻き込んで誘爆大爆発！）
+                  playSfx('explosion');
+                  shakeIntensity = 0.8;
+                  spawnExplosionSmoke(zx, 0.7, zz, 25);
+
+                  for (let o = zombies.length - 1; o >= 0; o--) {
+                    const oz = zombies[o];
+                    if (oz !== z && oz.mesh.position.distanceTo(z.mesh.position) < 3.5) {
+                      oz.hp -= 8;
+                      if (oz.hp <= 0) {
+                        spawnMeatDebris(oz.mesh.position.x, 0.7, oz.mesh.position.z, 0xef4444, 10);
+                        scene.remove(oz.mesh);
+                        zombies.splice(o, 1);
+                        score++;
+                      }
+                    }
+                  }
+                } else {
                   spawnMeatDebris(zx, 0.7, zz, 0xef4444, z.type === 'tank' ? 30 : 12);
-                  scene.remove(z.mesh);
-                  zombies.splice(j, 1);
-                  score++;
-                  document.getElementById('score-val').innerText = score;
                 }
+
+                scene.remove(z.mesh);
+                zombies.splice(j, 1);
+                score++;
+                document.getElementById('score-val').innerText = score;
+              }
+
+              if (b.penetration <= 0) {
+                bulletRemoved = true;
                 break;
               }
             }
           }
 
-          // ボス衝突判定
-          if (!hit && boss) {
+          // C. ボス衝突判定
+          if (!bulletRemoved && boss) {
             const bx = boss.mesh.position.x;
             const bz = boss.mesh.position.z;
             const inBossZ = (oldZ >= bz - 2.2) && (newZ <= bz + 2.2);
@@ -1586,9 +1691,10 @@
 
             if (inBossZ && inBossX) {
               const isCrit = Math.random() < 0.25;
-              const dmg = isCrit ? 3 : 1;
+              const dmg = (isCrit ? 3 : 1) * b.damage;
               boss.hp -= dmg;
-              hit = true;
+              b.penetration--;
+
               chargeUlt(1.5);
               playSfx('splat');
               showDamageNumber(dmg, bx, 2.5, bz, isCrit);
@@ -1607,57 +1713,71 @@
                 playSfx('explosion');
                 scene.remove(boss.mesh);
                 boss = null;
-                score += 100;
+                score += 150;
                 document.getElementById('score-val').innerText = score;
                 endGame(true);
                 return;
               }
+
+              if (b.penetration <= 0) bulletRemoved = true;
             }
           }
 
-          if (hit) {
+          if (bulletRemoved) {
             scene.remove(b.mesh);
             bullets.splice(i, 1);
           }
         }
 
-        // --- 2. ゾンビの移動＆アニメ更新（腕突き出し＆首かしげ徘徊） ---
+        // --- 2. ゾンビの移動＆アニメ更新 ---
         for (let i = zombies.length - 1; i >= 0; i--) {
           const z = zombies[i];
           z.mesh.position.z += z.speed;
           if (z.mixer) z.mixer.update(delta);
 
-          // ボーン直接制御で「不気味なゾンビ徘徊ポーズ」を維持
+          // ゾンビ特有の千鳥足＆猫背
           if (z.bones) {
             const zSwing = Math.sin(gameTime * 4 + z.wobbleSeed) * 0.15;
             if (z.bones.rightArm) z.bones.rightArm.rotation.set(-1.55 + zSwing, 0.1, 0.15);
             if (z.bones.leftArm) z.bones.leftArm.rotation.set(-1.5 - zSwing, -0.1, -0.15);
-            if (z.bones.rightHand) z.bones.rightHand.rotation.set(0.55, 0, 0); // 手首ダラン
+            if (z.bones.rightHand) z.bones.rightHand.rotation.set(0.55, 0, 0);
             if (z.bones.leftHand) z.bones.leftHand.rotation.set(0.55, 0, 0);
-            if (z.bones.spine) z.bones.spine.rotation.set(0.35, 0, zSwing * 0.4); // 猫背＆横揺れ
-            if (z.bones.neck) z.bones.neck.rotation.set(0.15, zSwing * 0.8, 0.25); // 首かしげ
+            if (z.bones.spine) z.bones.spine.rotation.set(0.35, 0, zSwing * 0.4);
+            if (z.bones.neck) z.bones.neck.rotation.set(0.15, zSwing * 0.8, 0.25);
           }
 
-          // 防衛ライン突入
+          // 防衛ライン突入（シビアなダメージ判定！）
           if (z.mesh.position.z >= DEFENSE_Z) {
             spawnMeatDebris(z.mesh.position.x, 0.6, z.mesh.position.z, 0xef4444, 15);
             scene.remove(z.mesh);
             zombies.splice(i, 1);
 
-            removeSquad(z.type === 'tank' ? 3 : 1);
+            // ボマー突入時は大惨事（兵士4人即死）！
+            if (z.type === 'boomer') {
+              playSfx('explosion');
+              removeSquad(4);
+            } else if (z.type === 'tank' || z.type === 'armored') {
+              removeSquad(2);
+            } else {
+              removeSquad(1);
+            }
+
             if (!isPlaying) return;
           }
         }
 
-        // ボス移動＆ゾンビ骨格更新
+        // ボス行動（狂暴化咆哮ギミック）
         if (boss) {
           boss.mesh.position.z += boss.speed;
           if (boss.mixer) boss.mixer.update(delta);
 
-          if (boss.bones) {
-            if (boss.bones.rightArm) boss.bones.rightArm.rotation.set(-1.45, 0.1, 0.1);
-            if (boss.bones.leftArm) boss.bones.leftArm.rotation.set(-1.4, -0.1, -0.1);
-            if (boss.bones.spine) boss.bones.spine.rotation.set(0.3, 0, 0);
+          boss.roarTimer -= delta;
+          if (boss.roarTimer <= 0) {
+            boss.roarTimer = 5.0;
+            playSfx('explosion');
+            shakeIntensity = 0.8;
+            // 咆哮で全ゾンビの足を一時加速！
+            zombies.forEach(z => { z.speed *= 1.35; });
           }
 
           if (boss.mesh.position.z >= DEFENSE_Z - 1.5) {
@@ -1666,18 +1786,23 @@
           }
         }
 
-        // ゲート通過
+        // ゲート通過（部隊の増減判定）
         for (let i = gates.length - 1; i >= 0; i--) {
           const g = gates[i];
-          g.mesh.position.z += 0.11;
+          g.mesh.position.z += 0.12;
+
           if (!g.applied && Math.abs(g.mesh.position.z - DEFENSE_Z) < 1.0) {
             const left = g.mesh.position.x - g.width / 2;
             const right = g.mesh.position.x + g.width / 2;
             if (playerLeaderX >= left && playerLeaderX <= right) {
               g.applied = true;
-              shakeIntensity = 0.25;
-              if (g.isPos) addSquad(g.val);
-              else removeSquad(Math.abs(g.val));
+              shakeIntensity = 0.3;
+              if (g.isPos) {
+                addSquad(g.val);
+              } else {
+                // 赤壁に突っ込むと激減！
+                removeSquad(Math.abs(g.val));
+              }
             }
           }
           if (g.mesh.position.z > DEFENSE_Z + 4) {
@@ -1719,7 +1844,7 @@
       renderer.render(scene, camera);
     }
 
-    // --- ゲームオーバー / クリア ---
+    // --- リザルト画面 ---
     function endGame(isClear) {
       isPlaying = false;
       const res = document.getElementById('result-screen');
@@ -1727,13 +1852,13 @@
       const desc = document.getElementById('result-desc');
 
       if (isClear) {
-        title.innerText = 'SECTOR SECURED';
+        title.innerText = 'MISSION ACCOMPLISHED';
         title.style.color = '#22c55e';
-        desc.innerHTML = `変異巨獣ゴライアスを完全殲滅！<br>橋の防衛と封じ込めに成功した！<br><br>撃破数: <b>${score}体</b><br>残存戦力: <b>${squadMembers.length}名</b>`;
+        desc.innerHTML = `変異巨獣ゴライアスを完全殲滅！<br>ゾンビの大津波を封じ込めた！<br><br>撃破数: <b>${score}体</b><br>残存戦力: <b>${squadMembers.length}名</b>`;
       } else {
-        title.innerText = 'OVERRUN BY HORDE';
+        title.innerText = 'DEFENSE OVERRUN';
         title.style.color = '#ef4444';
-        desc.innerHTML = `防衛部隊が壊滅し、橋を突破された...<br><br>撃破数: <b>${score}体</b>`;
+        desc.innerHTML = `ゾンビの群れに防衛線を突破された...<br><br>撃破数: <b>${score}体</b>`;
       }
       res.style.display = 'flex';
     }
