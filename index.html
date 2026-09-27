@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>DEAD BRIDGE: ARMED & READY</title>
+  <title>DEAD BRIDGE: ARSENAL OVERDRIVE</title>
   <style>
     * {
       box-sizing: border-box;
@@ -79,21 +79,48 @@
     #squad-val { font-size: 20px; color: #38bdf8; text-shadow: 0 0 8px rgba(56, 189, 248, 0.5); }
     #score-val { font-size: 20px; color: #facc15; text-shadow: 0 0 8px rgba(250, 204, 21, 0.5); }
 
-    /* 特殊武器アクティブHUD */
-    #weapon-hud {
+    /* 永続武器ステータスHUD */
+    #weapon-status-hud {
       position: absolute;
-      top: calc(env(safe-area-inset-top, 14px) + 52px);
+      top: calc(env(safe-area-inset-top, 14px) + 48px);
+      left: 14px;
+      display: flex;
+      gap: 6px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .wpn-chip {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1.5px solid #475569;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 900;
+      color: #94a3b8;
+      letter-spacing: 0.5px;
+      backdrop-filter: blur(8px);
+    }
+    .wpn-chip.active {
+      border-color: #facc15;
+      color: #facc15;
+      box-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
+    }
+
+    /* アップグレード告知バナー */
+    #upgrade-banner {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 14px) + 75px);
       left: 50%;
-      transform: translateX(-50%);
+      transform: translateX(-50%) scale(0.8);
       padding: 6px 20px;
-      background: linear-gradient(90deg, rgba(234, 179, 8, 0.9), rgba(249, 115, 22, 0.9));
+      background: linear-gradient(90deg, rgba(234, 179, 8, 0.95), rgba(249, 115, 22, 0.95));
       border: 2px solid #ffffff;
       border-radius: 20px;
       color: #fff;
       font-weight: 900;
       font-size: 12px;
       letter-spacing: 1.5px;
-      box-shadow: 0 0 25px rgba(249, 115, 22, 0.8);
+      box-shadow: 0 0 25px rgba(249, 115, 22, 0.85);
       display: none;
       z-index: 15;
       pointer-events: none;
@@ -103,7 +130,7 @@
     /* ボスHUD */
     #boss-hud {
       position: absolute;
-      top: calc(env(safe-area-inset-top, 14px) + 54px);
+      top: calc(env(safe-area-inset-top, 14px) + 105px);
       left: 50%;
       transform: translateX(-50%);
       width: 84%;
@@ -189,7 +216,7 @@
       color: #ffffff;
       text-shadow: 0 2px 4px #000, 0 0 8px rgba(0,0,0,0.9);
       pointer-events: none;
-      transition: transform 0.5s ease-out, opacity 0.5s;
+      transition: transform 0.4s ease-out, opacity 0.4s;
     }
     .dmg-num.crit {
       font-size: 24px;
@@ -201,7 +228,7 @@
     .screen-overlay {
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.9) 0%, rgba(2, 6, 23, 0.98) 100%);
+      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.92) 0%, rgba(2, 6, 23, 0.98) 100%);
       backdrop-filter: blur(16px);
       display: flex;
       flex-direction: column;
@@ -278,7 +305,7 @@
 <body>
   <div id="game-container">
     <div id="vignette"></div>
-    <div id="weapon-hud">🔥 GATLING OVERDRIVE (8s) 🔥</div>
+    <div id="upgrade-banner">⚡ RAPID-FIRE UPGRADED! ⚡</div>
     <div id="error-box"></div>
     <div id="damage-layer"></div>
 
@@ -286,12 +313,19 @@
       <div class="hud-badge">
         <span>SQUAD:</span>
         <span id="squad-val">1</span>
-        <span style="font-size: 11px; color: #94a3b8;">/15</span>
+        <span style="font-size: 11px; color: #94a3b8;">/8</span>
       </div>
       <div class="hud-badge score-badge">
         <span>KILLS:</span>
         <span id="score-val">0</span>
       </div>
+    </div>
+
+    <!-- 永続武器ステータス -->
+    <div id="weapon-status-hud">
+      <div id="chip-rapid" class="wpn-chip">⚡ RATE: Lv1</div>
+      <div id="chip-spread" class="wpn-chip">💥 SHOT: 1-WAY</div>
+      <div id="chip-rpg" class="wpn-chip">💣 EXP: OFF</div>
     </div>
 
     <!-- ボスHUD -->
@@ -310,12 +344,12 @@
 
     <!-- スタート画面 -->
     <div id="start-screen" class="screen-overlay">
-      <h1 class="screen-title">DEAD BRIDGE: ARMED</h1>
+      <h1 class="screen-title">DEAD BRIDGE: OVERKILL</h1>
       <p id="start-subtext" class="screen-desc">
-        <b>【新兵装ドロップ投入】</b><br>
-        流れてくる<b>黄金の武器クレート</b>を拾ってパワーアップ！<br>
-        ガトリング超連射・3WAY散弾・榴弾RPGで大群を粉砕せよ。<br>
-        左右移動でゾンビを狙い撃ち、防衛線を死守せよ！
+        <b>【永続兵装ビルドアップ迎撃戦】</b><br>
+        流れてくる武器クレートを拾うと<b>武器が永久強化＆スタック</b>！<br>
+        超速連射・多連装散弾・爆破弾頭へと銃を進化させよ。<br>
+        育て上げた圧倒的火力で、後半のゾンビ大津波を粉砕せよ！
       </p>
 
       <div id="loading-box">
@@ -325,7 +359,7 @@
         </div>
       </div>
 
-      <button id="start-btn" class="btn-main" style="display: none; margin-top: 15px;">START MISSION</button>
+      <button id="start-btn" class="btn-main" style="display: none; margin-top: 15px;">COMMENCE DEFENSE</button>
     </div>
 
     <!-- リザルト画面 -->
@@ -402,7 +436,7 @@
       try {
         const now = audioCtx.currentTime;
         if (type === 'rifle') {
-          const bufferSize = audioCtx.sampleRate * 0.07;
+          const bufferSize = audioCtx.sampleRate * 0.06;
           const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
           const data = buffer.getChannelData(0);
           for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
@@ -410,15 +444,15 @@
           const noise = audioCtx.createBufferSource();
           noise.buffer = buffer;
           const gain = audioCtx.createGain();
-          gain.gain.setValueAtTime(0.12, now);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+          gain.gain.setValueAtTime(0.11, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
 
           const osc = audioCtx.createOscillator();
           const oGain = audioCtx.createGain();
           osc.type = 'triangle';
           osc.frequency.setValueAtTime(180, now);
           osc.frequency.exponentialRampToValueAtTime(40, now + 0.05);
-          oGain.gain.setValueAtTime(0.14, now);
+          oGain.gain.setValueAtTime(0.13, now);
           oGain.gain.linearRampToValueAtTime(0.001, now + 0.05);
 
           noise.connect(gain);
@@ -427,7 +461,7 @@
           oGain.connect(audioCtx.destination);
           noise.start(now);
           osc.start(now);
-          osc.stop(now + 0.07);
+          osc.stop(now + 0.06);
         } else if (type === 'splat') {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
@@ -440,18 +474,19 @@
           gain.connect(audioCtx.destination);
           osc.start(now);
           osc.stop(now + 0.07);
-        } else if (type === 'pickup') {
+        } else if (type === 'upgrade') {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.type = 'sine';
           osc.frequency.setValueAtTime(440, now);
-          osc.frequency.setValueAtTime(880, now + 0.1);
-          gain.gain.setValueAtTime(0.18, now);
-          gain.gain.linearRampToValueAtTime(0.001, now + 0.25);
+          osc.frequency.setValueAtTime(660, now + 0.08);
+          osc.frequency.setValueAtTime(880, now + 0.16);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.linearRampToValueAtTime(0.001, now + 0.35);
           osc.connect(gain);
           gain.connect(audioCtx.destination);
           osc.start(now);
-          osc.stop(now + 0.25);
+          osc.stop(now + 0.35);
         } else if (type === 'explosion') {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
@@ -484,18 +519,21 @@
     // --- ゲーム設定 ---
     const BRIDGE_WIDTH = 9.6;
     const DEFENSE_Z = 13.0;
-    const MAX_SQUAD = 15;
+    const MAX_SQUAD = 8;
     let isPlaying = false;
     let score = 0;
     let gameTime = 0;
     let spawnTimer = 0;
     let gateTimer = 0;
-    let weaponDropTimer = 6.0; // 武器ドロップの定期出現タイマー
+    let weaponDropTimer = 8.0;
     let shakeIntensity = 0;
 
-    // パワーアップ武器状態
-    let currentWeapon = 'normal'; // 'normal', 'gatling', 'spread', 'rpg'
-    let weaponTimer = 0;
+    // --- 永続武器アップグレードステータス ---
+    let weaponUpgrades = {
+      rapidLevel: 1,    // 射撃レートLv (1〜4)
+      spreadLevel: 1,   // 同時発射数 (1=1WAY, 2=2WAY, 3=3WAY, 4=5WAY)
+      explosive: false  // 榴弾爆発の有無
+    };
 
     let ultGauge = 0;
     let isUltReady = false;
@@ -511,7 +549,7 @@
     let bullets = [];
     let zombies = [];
     let gates = [];
-    let weaponCrates = []; // 流れてくる武器コンテナ
+    let weaponCrates = [];
     let particles = [];
     let shellCasings = [];
     let muzzleFlashes = [];
@@ -521,7 +559,7 @@
     let soldierAnimations = [];
     let hasLoadedAsset = false;
 
-    // --- 高精細テクスチャ生成 ---
+    // --- テクスチャ生成 ---
     function createRoadTexture() {
       const cvs = document.createElement('canvas');
       cvs.width = 1024; cvs.height = 1024;
@@ -590,7 +628,7 @@
       ctx.fillStyle = '#cbd5e1';
       ctx.font = 'bold 24px -apple-system, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(isPos ? 'REINFORCE' : 'AMBUSH', 128, 50);
+      ctx.fillText(isPos ? 'PIERCE-AMP' : 'HAZARD', 128, 50);
 
       ctx.fillStyle = '#ffffff';
       ctx.font = '900 84px Impact, sans-serif';
@@ -623,7 +661,7 @@
       return new THREE.CanvasTexture(cvs);
     }
 
-    // --- 武器クレートモデル（黄金の補給コンテナ） ---
+    // --- 黄金の武器クレート ---
     function createWeaponCrate(type, x, z) {
       const g = new THREE.Group();
       const boxGeo = new THREE.BoxGeometry(1.2, 0.8, 0.8);
@@ -639,12 +677,11 @@
       box.castShadow = true;
       g.add(box);
 
-      // 上部に浮かぶネオンアイコン
       const iconGeo = new THREE.SphereGeometry(0.25, 8, 8);
       let iconColor = 0xf59e0b;
-      if (type === 'gatling') iconColor = 0x38bdf8;
+      if (type === 'rapid') iconColor = 0x38bdf8;
       if (type === 'spread') iconColor = 0x22c55e;
-      if (type === 'rpg') iconColor = 0xef4444;
+      if (type === 'explosive') iconColor = 0xef4444;
 
       const icon = new THREE.Mesh(iconGeo, new THREE.MeshBasicMaterial({ color: iconColor }));
       icon.position.y = 1.3;
@@ -653,7 +690,7 @@
       g.position.set(x, 0, z);
       scene.add(g);
 
-      return { mesh: g, type, box };
+      return { mesh: g, type };
     }
 
     // --- 特殊部隊装備 ---
@@ -698,7 +735,7 @@
 
       if (type === 'tank') {
         const tumorMat = new THREE.MeshStandardMaterial({ color: 0x7f1d1d, roughness: 0.5 });
-        const tumor = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), tumorMat);
+        const tumor = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 8), tumorMat);
         tumor.position.set(0.2, 1.3, -0.1);
         gore.add(tumor);
       }
@@ -751,7 +788,7 @@
       const model = THREE.SkeletonUtils.clone(baseSoldierModel);
       let scale = 1.15;
       if (type === 'runner') scale = 0.95;
-      if (type === 'tank') scale = 1.85;
+      if (type === 'tank') scale = 1.95;
 
       model.scale.set(scale, scale, scale);
 
@@ -761,7 +798,7 @@
 
       if (type === 'runner') {
         clip = soldierAnimations[1];
-        animSpeed = 1.85;
+        animSpeed = 2.1;
       }
       const action = mixer.clipAction(clip);
       action.timeScale = animSpeed;
@@ -905,7 +942,6 @@
       railR.position.x = BRIDGE_WIDTH / 2;
       scene.add(railL, railR);
 
-      // 防衛境界ライン
       const defLine = new THREE.Mesh(
         new THREE.BoxGeometry(BRIDGE_WIDTH, 0.08, 0.4),
         new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4 })
@@ -951,7 +987,7 @@
       );
     }
 
-    // --- 入力制御（左右ドラッグ操作） ---
+    // --- 入力制御（指でドラッグ操作） ---
     function setupTouchControls() {
       let startX = 0;
       let initX = 0;
@@ -989,14 +1025,14 @@
       renderer.setSize(c.clientWidth, c.clientHeight);
     }
 
-    // --- 部隊編成（密集デルタ隊形） ---
+    // --- 部隊編成（デルタ隊形・最大8名） ---
     function updateSquadLayout() {
       document.getElementById('squad-val').innerText = squadMembers.length;
       squadMembers.forEach((m, idx) => {
         if (idx === 0) { m.offsetX = 0; m.offsetZ = 0; return; }
         const row = Math.floor((idx + 1) / 2);
         const side = idx % 2 === 1 ? -1 : 1;
-        m.offsetX = side * (row * 0.32);
+        m.offsetX = side * (row * 0.35);
         m.offsetZ = row * 0.75;
       });
     }
@@ -1023,7 +1059,7 @@
 
     function removeSquad(cnt) {
       playSfx('splat');
-      shakeIntensity = 0.6;
+      shakeIntensity = 0.65;
 
       const vig = document.getElementById('vignette');
       vig.classList.add('hit');
@@ -1033,7 +1069,7 @@
       for (let i = 0; i < actualRemove; i++) {
         if (squadMembers.length > 0) {
           const m = squadMembers.pop();
-          spawnMeatDebris(m.mesh.position.x, 0.6, m.mesh.position.z, 0xef4444, 12);
+          spawnMeatDebris(m.mesh.position.x, 0.6, m.mesh.position.z, 0xef4444, 15);
           scene.remove(m.mesh);
         }
       }
@@ -1046,12 +1082,12 @@
 
     // --- ゲート管理 ---
     function spawnGatePair() {
-      const z = -50;
+      const z = -48;
       const w = BRIDGE_WIDTH / 2 - 0.35;
       const leftGood = Math.random() < 0.5;
 
-      const g1 = createMilGate(leftGood ? 2 : -3, leftGood, -w / 2 - 0.15, z, w);
-      const g2 = createMilGate(!leftGood ? 2 : -3, !leftGood, w / 2 + 0.15, z, w);
+      const g1 = createMilGate(leftGood ? 1 : -2, leftGood, -w / 2 - 0.15, z, w);
+      const g2 = createMilGate(!leftGood ? 1 : -2, !leftGood, w / 2 + 0.15, z, w);
       gates.push(g1, g2);
     }
 
@@ -1084,18 +1120,50 @@
       g.panel.material.needsUpdate = true;
     }
 
-    // --- 武器パワーアップ発動 ---
-    function activateWeapon(type) {
-      currentWeapon = type;
-      weaponTimer = 8.5; // 8.5秒間持続
-      playSfx('pickup');
+    // --- 【新実装】永続武器アップグレード ---
+    function applyPermanentUpgrade(type) {
+      playSfx('upgrade');
+      const banner = document.getElementById('upgrade-banner');
 
-      const hud = document.getElementById('weapon-hud');
-      hud.style.display = 'block';
+      if (type === 'rapid') {
+        weaponUpgrades.rapidLevel = Math.min(4, weaponUpgrades.rapidLevel + 1);
+        banner.innerText = `⚡ RAPID-FIRE UPGRADED (Lv${weaponUpgrades.rapidLevel})! ⚡`;
+      } else if (type === 'spread') {
+        weaponUpgrades.spreadLevel = Math.min(4, weaponUpgrades.spreadLevel + 1);
+        const wayName = weaponUpgrades.spreadLevel === 2 ? '2-WAY' : (weaponUpgrades.spreadLevel === 3 ? '3-WAY' : '5-WAY');
+        banner.innerText = `💥 MULTI-BARREL EVOLVED (${wayName})! 💥`;
+      } else if (type === 'explosive') {
+        weaponUpgrades.explosive = true;
+        banner.innerText = `💣 HIGH-EXPLOSIVE ROUNDS ARMED! 💣`;
+      }
 
-      if (type === 'gatling') hud.innerText = '🔥 GATLING OVERDRIVE (8s) 🔥';
-      else if (type === 'spread') hud.innerText = '⚡ 3-WAY SPREAD SHOT (8s) ⚡';
-      else if (type === 'rpg') hud.innerText = '💥 EXPLOSIVE RPG ROUNDS (8s) 💥';
+      updateWeaponHud();
+
+      // バナーアニメーション表示
+      banner.style.display = 'block';
+      gsap.fromTo(banner, { scale: 0.7, opacity: 0 }, {
+        scale: 1.05, opacity: 1, duration: 0.3, onComplete: () => {
+          gsap.to(banner, { scale: 1.0, opacity: 0, delay: 1.5, duration: 0.3, onComplete: () => { banner.style.display = 'none'; } });
+        }
+      });
+    }
+
+    function updateWeaponHud() {
+      const rChip = document.getElementById('chip-rapid');
+      const sChip = document.getElementById('chip-spread');
+      const eChip = document.getElementById('chip-rpg');
+
+      rChip.innerText = `⚡ RATE: Lv${weaponUpgrades.rapidLevel}`;
+      if (weaponUpgrades.rapidLevel > 1) rChip.classList.add('active');
+
+      const wayName = weaponUpgrades.spreadLevel === 1 ? '1-WAY' : (weaponUpgrades.spreadLevel === 2 ? '2-WAY' : (weaponUpgrades.spreadLevel === 3 ? '3-WAY' : '5-WAY'));
+      sChip.innerText = `💥 SHOT: ${wayName}`;
+      if (weaponUpgrades.spreadLevel > 1) sChip.classList.add('active');
+
+      if (weaponUpgrades.explosive) {
+        eChip.innerText = `💣 EXP: ON`;
+        eChip.classList.add('active');
+      }
     }
 
     function showDamageNumber(val, x, y, z, isCrit = false) {
@@ -1115,7 +1183,7 @@
       gsap.to(div, {
         y: sy - 35,
         opacity: 0,
-        duration: 0.45,
+        duration: 0.4,
         ease: 'power2.out',
         onComplete: () => div.remove()
       });
@@ -1143,8 +1211,8 @@
           for (let i = zombies.length - 1; i >= 0; i--) {
             const z = zombies[i];
             if (Math.abs(z.mesh.position.z - boomZ) < 6.0) {
-              z.hp -= 30;
-              showDamageNumber(30, z.mesh.position.x, 1, z.mesh.position.z, true);
+              z.hp -= 25;
+              showDamageNumber(25, z.mesh.position.x, 1, z.mesh.position.z, true);
               if (z.hp <= 0) {
                 spawnMeatDebris(z.mesh.position.x, 0.7, z.mesh.position.z, 0xef4444, 15);
                 scene.remove(z.mesh);
@@ -1156,8 +1224,8 @@
           }
 
           if (boss && Math.abs(boss.mesh.position.z - boomZ) < 7.0) {
-            boss.hp -= 35;
-            showDamageNumber(35, boss.mesh.position.x, 2.5, boss.mesh.position.z, true);
+            boss.hp -= 30;
+            showDamageNumber(30, boss.mesh.position.x, 2.5, boss.mesh.position.z, true);
             updateBossHp();
           }
         }, k * 110);
@@ -1209,9 +1277,12 @@
       gameTime = 0;
       spawnTimer = 0;
       gateTimer = 1.0;
-      weaponDropTimer = 5.0; // 開始5秒後に最初の武器ドロップ！
-      currentWeapon = 'normal';
-      weaponTimer = 0;
+      weaponDropTimer = 5.0; // 最初の武器は5秒後にすぐ流れてくる！
+
+      // 永続ステータス初期化
+      weaponUpgrades = { rapidLevel: 1, spreadLevel: 1, explosive: false };
+      updateWeaponHud();
+
       shakeIntensity = 0;
       ultGauge = 0;
       isUltReady = false;
@@ -1234,7 +1305,6 @@
       updateUltUi();
       document.getElementById('score-val').innerText = '0';
       document.getElementById('boss-hud').style.display = 'none';
-      document.getElementById('weapon-hud').style.display = 'none';
 
       isPlaying = true;
     }
@@ -1342,21 +1412,6 @@
 
         playerLeaderX += (targetX - playerLeaderX) * 0.24;
 
-        // 特殊武器タイマー更新
-        if (weaponTimer > 0) {
-          weaponTimer -= delta;
-          const hud = document.getElementById('weapon-hud');
-          const sec = Math.ceil(weaponTimer);
-          if (currentWeapon === 'gatling') hud.innerText = `🔥 GATLING OVERDRIVE (${sec}s) 🔥`;
-          else if (currentWeapon === 'spread') hud.innerText = `⚡ 3-WAY SPREAD SHOT (${sec}s) ⚡`;
-          else if (currentWeapon === 'rpg') hud.innerText = `💥 EXPLOSIVE RPG (${sec}s) 💥`;
-
-          if (weaponTimer <= 0) {
-            currentWeapon = 'normal';
-            hud.style.display = 'none';
-          }
-        }
-
         // 兵士更新
         squadMembers.forEach(m => {
           if (m.recoil > 0) {
@@ -1379,16 +1434,18 @@
           }
         });
 
-        // 武器別フルオート射撃ロジック
+        // --- 射撃ロジック（永続アップグレード適用） ---
         shootCool -= delta;
-        const cooldown = (currentWeapon === 'gatling') ? 0.055 : (currentWeapon === 'rpg' ? 0.20 : 0.12);
+        // 連射レベルに応じてクールダウン短縮（0.12s ➜ 0.09s ➜ 0.07s ➜ 0.055s）
+        const cooldowns = [0.12, 0.09, 0.07, 0.055];
+        const currentCooldown = cooldowns[weaponUpgrades.rapidLevel - 1];
 
         if (shootCool <= 0) {
-          shootCool = cooldown;
+          shootCool = currentCooldown;
           playSfx('rifle');
 
           muzzleLight.position.set(playerLeaderX, 1.2, DEFENSE_Z - 0.8);
-          muzzleLight.intensity = (currentWeapon === 'gatling') ? 3.5 : 2.8;
+          muzzleLight.intensity = 2.8 + weaponUpgrades.rapidLevel * 0.4;
 
           squadMembers.forEach(m => {
             m.recoil = 1.0;
@@ -1398,34 +1455,17 @@
 
             spawnMuzzleFlash(muzzleX, muzzleY, muzzleZ);
 
-            // 弾丸生成（通常 / ガトリング / 3WAY / RPG）
-            if (currentWeapon === 'spread') {
-              // 3WAY散弾
-              [-0.12, 0, 0.12].forEach(vx => {
-                const tracerGeo = new THREE.CylinderGeometry(0.035, 0.05, 1.4, 6);
-                tracerGeo.rotateX(Math.PI / 2);
-                const tracer = new THREE.Mesh(tracerGeo, new THREE.MeshBasicMaterial({ map: tracerTextureAmp, transparent: true }));
-                tracer.position.set(muzzleX, muzzleY, muzzleZ - 0.7);
-                scene.add(tracer);
+            // 多連装スプレッド角設定
+            let angles = [0];
+            if (weaponUpgrades.spreadLevel === 2) angles = [-0.04, 0.04];
+            else if (weaponUpgrades.spreadLevel === 3) angles = [-0.09, 0, 0.09];
+            else if (weaponUpgrades.spreadLevel >= 4) angles = [-0.15, -0.07, 0, 0.07, 0.15];
 
-                bullets.push({
-                  mesh: tracer,
-                  vz: -1.35,
-                  vx: vx,
-                  damage: 1.5,
-                  penetration: 2,
-                  isRpg: false,
-                  prevZ: muzzleZ - 0.7,
-                  passedGates: new Set()
-                });
-              });
-            } else {
-              // 通常・ガトリング・RPG
-              const isRpg = (currentWeapon === 'rpg');
-              const tracerGeo = new THREE.CylinderGeometry(isRpg ? 0.08 : 0.035, isRpg ? 0.09 : 0.05, isRpg ? 1.0 : 1.4, 6);
+            angles.forEach(vx => {
+              const tracerGeo = new THREE.CylinderGeometry(weaponUpgrades.explosive ? 0.055 : 0.035, weaponUpgrades.explosive ? 0.07 : 0.05, 1.4, 6);
               tracerGeo.rotateX(Math.PI / 2);
               const tracer = new THREE.Mesh(tracerGeo, new THREE.MeshBasicMaterial({
-                map: (currentWeapon === 'gatling') ? tracerTextureAmp : tracerTextureNormal,
+                map: (weaponUpgrades.rapidLevel >= 3) ? tracerTextureAmp : tracerTextureNormal,
                 transparent: true
               }));
               tracer.position.set(muzzleX, muzzleY, muzzleZ - 0.7);
@@ -1433,15 +1473,15 @@
 
               bullets.push({
                 mesh: tracer,
-                vz: isRpg ? -1.1 : -1.45,
-                vx: (Math.random() - 0.5) * 0.015,
-                damage: isRpg ? 6 : (currentWeapon === 'gatling' ? 1.4 : 1),
-                penetration: isRpg ? 1 : (currentWeapon === 'gatling' ? 2 : 1),
-                isRpg: isRpg,
+                vz: -1.45,
+                vx: vx + (Math.random() - 0.5) * 0.01,
+                damage: weaponUpgrades.explosive ? 2.5 : 1.2,
+                penetration: weaponUpgrades.spreadLevel >= 3 ? 2 : 1,
+                isExplosive: weaponUpgrades.explosive,
                 prevZ: muzzleZ - 0.7,
                 passedGates: new Set()
               });
-            }
+            });
 
             spawnCasing(muzzleX + 0.15, muzzleY, muzzleZ + 0.35);
           });
@@ -1464,27 +1504,27 @@
           gateTimer = 8.5;
         }
 
-        // --- 武器クレートスポーン（定期的に補給が流れてくる） ---
+        // --- 武器クレートスポーン（約10〜12秒ごとに出現） ---
         weaponDropTimer -= delta;
         if (weaponDropTimer <= 0 && weaponCrates.length === 0) {
-          weaponDropTimer = 13.0; // 約13秒ごとにドロップ
-          const types = ['gatling', 'spread', 'rpg'];
-          const selectedType = types[Math.floor(Math.random() * types.length)];
+          weaponDropTimer = 11.0;
+          const availableTypes = ['rapid', 'spread', 'explosive'];
+          const selectedType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
           const x = (Math.random() - 0.5) * (BRIDGE_WIDTH - 2.5);
           const crate = createWeaponCrate(selectedType, x, -52);
           weaponCrates.push(crate);
         }
 
-        // 武器クレート移動＆取得判定
+        // 武器クレート移動＆取得
         for (let i = weaponCrates.length - 1; i >= 0; i--) {
           const c = weaponCrates[i];
           c.mesh.position.z += 0.11;
-          c.mesh.rotation.y += 0.03; // クルクル回転して目立つ
+          c.mesh.rotation.y += 0.03;
 
-          // 自機部隊との接触判定（GET!）
+          // 自機との接触判定（永続強化GET!）
           if (Math.abs(c.mesh.position.z - DEFENSE_Z) < 1.4) {
             if (Math.abs(playerLeaderX - c.mesh.position.x) < 1.6) {
-              activateWeapon(c.type);
+              applyPermanentUpgrade(c.type);
               spawnMeatDebris(c.mesh.position.x, 0.8, c.mesh.position.z, 0xfacc15, 20);
               scene.remove(c.mesh);
               weaponCrates.splice(i, 1);
@@ -1498,46 +1538,84 @@
           }
         }
 
-        // --- ゾンビ大群スポーン（手応えがありつつ押し返せる適正バランス） ---
+        // --- ゾンビスポーン（成長した火力に釣り合う強襲） ---
         spawnTimer -= delta;
         if (spawnTimer <= 0) {
-          // 後半も「多すぎず少なすぎず」の適正量（5〜8体同時）
-          const baseCount = gameTime > 30 ? 5 : (gameTime > 18 ? 4 : 3);
-          const count = baseCount + Math.floor(Math.random() * 4);
+          const rand = Math.random();
 
-          for (let k = 0; k < count; k++) {
-            const rand = Math.random();
-            let type = 'normal';
-            if (rand < 0.35) type = 'runner'; // 猛ダッシュ
-            else if (rand < 0.55) type = 'tank'; // 肉壁タンク
-
-            const x = (Math.random() - 0.5) * (BRIDGE_WIDTH - 1.5);
-            const zOffset = -45 - Math.random() * 8;
-
-            const zObj = spawnZombieInstance(type);
-            zObj.model.position.set(x, 0, zOffset);
-            scene.add(zObj.model);
-
-            let hp = type === 'tank' ? 12 : (type === 'runner' ? 2 : 3);
-            let spd = type === 'runner' ? 0.25 : (type === 'tank' ? 0.08 : 0.12);
-
+          // パターンA: 【挟み撃ち】左右両端から高速ランナーが同時突入！
+          if (rand < 0.40) {
+            [-2.8, 2.8].forEach(lx => {
+              const zObj = spawnZombieInstance('runner');
+              zObj.model.position.set(lx, 0, -42);
+              scene.add(zObj.model);
+              zombies.push({
+                mesh: zObj.model,
+                mixer: zObj.mixer,
+                bones: zObj.bones,
+                mats: zObj.mats,
+                hp: 2,
+                type: 'runner',
+                speed: 0.28,
+                wobbleSeed: Math.random() * 10
+              });
+            });
+          }
+          // パターンB: 【肉壁タンク＋背後ランナー】
+          else if (rand < 0.70) {
+            const laneX = (Math.random() - 0.5) * (BRIDGE_WIDTH - 2.0);
+            const tankObj = spawnZombieInstance('tank');
+            tankObj.model.position.set(laneX, 0, -42);
+            scene.add(tankObj.model);
             zombies.push({
-              mesh: zObj.model,
-              mixer: zObj.mixer,
-              bones: zObj.bones,
-              mats: zObj.mats,
-              hp,
-              type,
-              speed: spd,
+              mesh: tankObj.model,
+              mixer: tankObj.mixer,
+              bones: tankObj.bones,
+              mats: tankObj.mats,
+              hp: 16,
+              type: 'tank',
+              speed: 0.08,
+              wobbleSeed: Math.random() * 10
+            });
+            const runObj = spawnZombieInstance('runner');
+            runObj.model.position.set(laneX + (Math.random() - 0.5) * 0.8, 0, -46);
+            scene.add(runObj.model);
+            zombies.push({
+              mesh: runObj.model,
+              mixer: runObj.mixer,
+              bones: runObj.bones,
+              mats: runObj.mats,
+              hp: 2,
+              type: 'runner',
+              speed: 0.28,
               wobbleSeed: Math.random() * 10
             });
           }
+          // パターンC: 通常の波状攻撃（3〜5体）
+          else {
+            const count = Math.floor(Math.random() * 3) + 3;
+            for (let k = 0; k < count; k++) {
+              const x = (Math.random() - 0.5) * (BRIDGE_WIDTH - 1.5);
+              const zObj = spawnZombieInstance('normal');
+              zObj.model.position.set(x, 0, -42 - Math.random() * 6);
+              scene.add(zObj.model);
+              zombies.push({
+                mesh: zObj.model,
+                mixer: zObj.mixer,
+                bones: zObj.bones,
+                mats: zObj.mats,
+                hp: 4,
+                type: 'normal',
+                speed: 0.12,
+                wobbleSeed: Math.random() * 10
+              });
+            }
+          }
 
-          // 最短0.4秒間隔で安定供給
-          spawnTimer = Math.max(0.4, 0.95 - gameTime * 0.012);
+          spawnTimer = Math.max(0.45, 1.05 - gameTime * 0.015);
         }
 
-        // ボス出現（38秒経過または撃破数到達）
+        // ボス出現
         if (!boss && (gameTime > 38 || score >= 85)) {
           const bObj = spawnGoliathBossInstance();
           bObj.model.position.set(0, 0, -55);
@@ -1548,9 +1626,9 @@
             mixer: bObj.mixer,
             bones: bObj.bones,
             mats: bObj.mats,
-            hp: 550,
-            maxHp: 550,
-            speed: 0.032
+            hp: 600,
+            maxHp: 600,
+            speed: 0.030
           };
           document.getElementById('boss-hud').style.display = 'flex';
           shakeIntensity = 1.0;
@@ -1572,7 +1650,7 @@
             continue;
           }
 
-          // 壁の貫通判定
+          // 壁貫通判定
           for (let g of gates) {
             const gz = g.mesh.position.z;
             if (oldZ >= gz - 0.5 && newZ <= gz + 0.5) {
@@ -1582,12 +1660,12 @@
 
                   if (g.isPos) {
                     g.shootHits++;
-                    if (g.shootHits % 25 === 0 && g.val < 4) {
+                    if (g.shootHits % 50 === 0 && g.val < 3) {
                       g.val++;
                       updateGateTexture(g);
                     }
-                    b.damage *= 1.8;
-                    b.penetration += 2;
+                    b.damage *= 1.5;
+                    b.penetration += 1;
                     b.mesh.material.map = tracerTextureAmp;
                   }
                 }
@@ -1614,20 +1692,20 @@
               z.hp -= dmg;
               b.penetration--;
 
-              chargeUlt(0.8);
+              chargeUlt(0.5);
               playSfx('splat');
               showDamageNumber(Math.floor(dmg), zx, 1.2, zz, isCrit || b.damage > 1.5);
               spawnMeatDebris(zx, 0.7, zz, 0x5a7d65, 3);
 
-              // RPG榴弾爆発処理（周囲を巻き込む）
-              if (b.isRpg) {
+              // 榴弾爆発処理（爆風で周囲の敵を巻き込む！）
+              if (b.isExplosive) {
                 playSfx('explosion');
-                shakeIntensity = 0.6;
-                spawnExplosionSmoke(zx, 0.7, zz, 20);
+                shakeIntensity = 0.5;
+                spawnExplosionSmoke(zx, 0.7, zz, 16);
                 for (let o = zombies.length - 1; o >= 0; o--) {
                   const oz = zombies[o];
-                  if (oz !== z && oz.mesh.position.distanceTo(z.mesh.position) < 3.2) {
-                    oz.hp -= 4;
+                  if (oz !== z && oz.mesh.position.distanceTo(z.mesh.position) < 2.8) {
+                    oz.hp -= 3;
                     if (oz.hp <= 0) {
                       spawnMeatDebris(oz.mesh.position.x, 0.7, oz.mesh.position.z, 0xef4444, 12);
                       scene.remove(oz.mesh);
@@ -1665,7 +1743,7 @@
             if ((oldZ >= bz - 2.2) && (newZ <= bz + 2.2) && Math.abs(b.mesh.position.x - bx) <= 2.2) {
               boss.hp -= b.damage;
               b.penetration--;
-              chargeUlt(0.6);
+              chargeUlt(0.4);
               playSfx('splat');
               showDamageNumber(Math.floor(b.damage), bx, 2.5, bz);
               updateBossHp();
@@ -1704,7 +1782,7 @@
             scene.remove(z.mesh);
             zombies.splice(i, 1);
 
-            removeSquad(z.type === 'tank' ? 2 : 1);
+            removeSquad(1);
             if (!isPlaying) return;
           }
         }
@@ -1780,11 +1858,11 @@
       const desc = document.getElementById('result-desc');
 
       if (isClear) {
-        title.innerText = 'MISSION ACCOMPLISHED';
+        title.innerText = 'MISSION COMPLETE';
         title.style.color = '#22c55e';
-        desc.innerHTML = `変異巨獣ゴライアスと大群を完全殲滅！<br>極限状況を生き延びた！<br><br>撃破数: <b>${score}体</b><br>残存戦力: <b>${squadMembers.length}名</b>`;
+        desc.innerHTML = `変異巨獣ゴライアスを完全撃破！<br>強化兵装で橋の防衛を完遂した！<br><br>撃破数: <b>${score}体</b><br>残存戦力: <b>${squadMembers.length}名</b>`;
       } else {
-        title.innerText = 'DEFENSE OVERRUN';
+        title.innerText = 'MISSION FAILED';
         title.style.color = '#ef4444';
         desc.innerHTML = `防衛線が突破され部隊が全滅した...<br><br>撃破数: <b>${score}体</b>`;
       }
