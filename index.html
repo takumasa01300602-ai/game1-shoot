@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Z-OUTBREAK: REVOLUTION</title>
+  <title>DEAD BRIDGE: MILITARY FIRING LINE</title>
   <style>
     * {
       box-sizing: border-box;
@@ -34,7 +34,7 @@
       height: 100%;
     }
 
-    /* 映画的シネマティックビネット */
+    /* シネマティックビネット */
     #vignette {
       position: absolute;
       inset: 0;
@@ -47,7 +47,7 @@
       box-shadow: inset 0 0 90px rgba(220, 38, 38, 0.85), inset 0 0 180px rgba(185, 28, 28, 0.7);
     }
 
-    /* ネイティブAAA級 HUD */
+    /* HUD */
     .hud-top {
       position: absolute;
       top: env(safe-area-inset-top, 14px);
@@ -122,7 +122,7 @@
       transition: width 0.08s linear;
     }
 
-    /* 空爆支援ボタン */
+    /* 空爆ボタン */
     #ult-btn {
       position: absolute;
       bottom: calc(env(safe-area-inset-bottom, 16px) + 20px);
@@ -255,7 +255,6 @@
     }
   </style>
 
-  <!-- Three.js + GLTFLoader + SkeletonUtils + GSAP -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
@@ -292,23 +291,24 @@
       <span id="ult-pct">0%</span>
     </button>
 
-    <!-- スタート画面 ＆ アセットローディング -->
+    <!-- スタート画面 -->
     <div id="start-screen" class="screen-overlay">
-      <h1 class="screen-title">Z-OUTBREAK: REVOLUTION</h1>
+      <h1 class="screen-title">DEAD BRIDGE: FIRING LINE</h1>
       <p id="start-subtext" class="screen-desc">
-        <b>【リアル3Dモデル・次世代サバイバー】</b><br>
-        晴天の巨大ベイブリッジを埋め尽くす<b>ゾンビの大群</b>を撃滅せよ！<br>
-        作戦ゲートを撃ち抜いて部隊を増殖させ、一斉掃射！
+        <b>【リアル・フルオート射撃迎撃戦】</b><br>
+        アサルトライフルを構え、押し寄せる<b>ゾンビの大群</b>を撃滅せよ！<br>
+        作戦ゲートを撃ち抜いて射撃小隊を大増殖させよ。<br>
+        反動（リコイル）に耐え、超音速曳光弾で敵を薙ぎ払え！
       </p>
 
       <div id="loading-box">
-        <div id="loading-text" style="color: #38bdf8; font-size: 11px; font-weight: 900; letter-spacing: 1px;">DOWNLOADING 3D ASSETS... (0%)</div>
+        <div id="loading-text" style="color: #38bdf8; font-size: 11px; font-weight: 900; letter-spacing: 1px;">DEPLOYING SQUAD ASSETS... (0%)</div>
         <div class="progress-bar-bg">
           <div id="loading-fill"></div>
         </div>
       </div>
 
-      <button id="start-btn" class="btn-main" style="display: none; margin-top: 15px;">COMMENCE ENGAGEMENT</button>
+      <button id="start-btn" class="btn-main" style="display: none; margin-top: 15px;">COMMENCE FIRING</button>
     </div>
 
     <!-- リザルト画面 -->
@@ -474,9 +474,9 @@
     let gates = [];
     let particles = [];
     let shellCasings = [];
+    let muzzleFlashes = [];
     let boss = null;
 
-    // --- 外部glTFアセット保持用 ---
     let baseSoldierModel = null;
     let soldierAnimations = [];
 
@@ -538,6 +538,7 @@
       const cvs = document.createElement('canvas');
       cvs.width = 256; cvs.height = 256;
       const ctx = cvs.getContext('2d');
+
       ctx.fillStyle = isPos ? 'rgba(30, 58, 138, 0.88)' : 'rgba(127, 29, 29, 0.88)';
       ctx.fillRect(0, 0, 256, 256);
 
@@ -558,17 +559,33 @@
       return new THREE.CanvasTexture(cvs);
     }
 
-    // --- 本物のアセットからキャラクター生成（SkeletonUtils.clone） ---
+    // --- リアル曳光弾テクスチャ（先端が発光、後端がグラデーションのビーム） ---
+    function createTracerTexture() {
+      const cvs = document.createElement('canvas');
+      cvs.width = 64; cvs.height = 256;
+      const ctx = cvs.getContext('2d');
+
+      const grad = ctx.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0, '#ffffff'); // 先端白熱
+      grad.addColorStop(0.2, '#fef08a'); // 黄色
+      grad.addColorStop(0.6, '#f97316'); // オレンジ
+      grad.addColorStop(1.0, 'rgba(239, 68, 68, 0)'); // 透明にフェードアウト
+
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 256);
+      return new THREE.CanvasTexture(cvs);
+    }
+
+    // --- 味方兵士の生成（Idleポーズ：銃を正面に構えて待機＋リコイル制御） ---
     function spawnSoldierInstance(isLeader = false) {
       const model = THREE.SkeletonUtils.clone(baseSoldierModel);
       model.scale.set(1.15, 1.15, 1.15);
 
-      // アニメーションミキサー
       const mixer = new THREE.AnimationMixer(model);
-      // Run: animations[1], Walk: animations[3], Idle: animations[0]
-      const runClip = soldierAnimations[1] || soldierAnimations[0];
-      const runAction = mixer.clipAction(runClip);
-      runAction.play();
+      // animations[0] は「ライフルを正面に構えて射撃姿勢をとるIdleポーズ」！
+      const aimClip = soldierAnimations[0];
+      const aimAction = mixer.clipAction(aimClip);
+      aimAction.play();
 
       model.traverse((child) => {
         if (child.isMesh) {
@@ -576,7 +593,7 @@
           child.receiveShadow = true;
           child.material = child.material.clone();
           if (isLeader) {
-            child.material.color.setHex(0x93c5fd); // リーダーは青系迷彩
+            child.material.color.setHex(0x93c5fd);
           }
         }
       });
@@ -584,6 +601,7 @@
       return { model, mixer };
     }
 
+    // --- ゾンビの生成（Walk / Run アニメーション） ---
     function spawnZombieInstance(type = 'normal') {
       const model = THREE.SkeletonUtils.clone(baseSoldierModel);
       let scale = 1.15;
@@ -597,7 +615,7 @@
       let animSpeed = 0.85;
 
       if (type === 'runner') {
-        clip = soldierAnimations[1]; // Run
+        clip = soldierAnimations[1]; // Run（猛ダッシュ！）
         animSpeed = 1.4;
       }
       const action = mixer.clipAction(clip);
@@ -612,32 +630,30 @@
           child.material = child.material.clone();
 
           if (type === 'runner') {
-            child.material.color.setHex(0x991b1b); // 血染めランナー
+            child.material.color.setHex(0x991b1b);
           } else if (type === 'tank') {
-            child.material.color.setHex(0x1e293b); // 黒変異タンク
+            child.material.color.setHex(0x1e293b);
           } else {
-            child.material.color.setHex(0x3f624d); // 腐敗グリーン
+            child.material.color.setHex(0x3f624d);
           }
           child.material.roughness = 0.85;
           mats.push(child.material);
         }
       });
 
-      // ゾンビらしく前進方向へ反転
       model.rotation.y = Math.PI;
-
       return { model, mixer, mats, scale };
     }
 
     function spawnGoliathBossInstance() {
       const model = THREE.SkeletonUtils.clone(baseSoldierModel);
-      const scale = 3.6; // 超巨大！
+      const scale = 3.6;
       model.scale.set(scale, scale, scale);
 
       const mixer = new THREE.AnimationMixer(model);
-      const clip = soldierAnimations[3] || soldierAnimations[0]; // Walk
+      const clip = soldierAnimations[3] || soldierAnimations[0];
       const action = mixer.clipAction(clip);
-      action.timeScale = 0.55; // 重厚なスロー歩行
+      action.timeScale = 0.55;
       action.play();
 
       const mats = [];
@@ -646,7 +662,7 @@
           child.castShadow = true;
           child.receiveShadow = true;
           child.material = child.material.clone();
-          child.material.color.setHex(0x450a0a); // ドス黒い赤
+          child.material.color.setHex(0x450a0a);
           child.material.roughness = 0.9;
           mats.push(child.material);
         }
@@ -657,6 +673,8 @@
     }
 
     // --- 初期セットアップ ---
+    let tracerTexture = null;
+
     function init() {
       const container = document.getElementById('game-container');
       const w = container.clientWidth;
@@ -679,7 +697,9 @@
       renderer.toneMappingExposure = 1.25;
       container.appendChild(renderer.domElement);
 
-      // 太陽光ライティング
+      tracerTexture = createTracerTexture();
+
+      // ライティング
       const hemiLight = new THREE.HemisphereLight(0xbae6fd, 0x0284c7, 0.75);
       scene.add(hemiLight);
 
@@ -698,7 +718,7 @@
       scene.add(sunLight);
 
       // マズル閃光ライト
-      muzzleLight = new THREE.PointLight(0xfef08a, 0, 8, 2);
+      muzzleLight = new THREE.PointLight(0xfef08a, 0, 10, 2);
       muzzleLight.position.set(0, 1.5, DEFENSE_Z);
       scene.add(muzzleLight);
 
@@ -760,7 +780,7 @@
       cableR.position.x = BRIDGE_WIDTH / 2 + 1.2;
       scene.add(cableL, cableR);
 
-      // 防衛ライン
+      // 防衛境界ライン
       const defLine = new THREE.Mesh(
         new THREE.BoxGeometry(BRIDGE_WIDTH, 0.06, 0.4),
         new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 })
@@ -772,8 +792,6 @@
       setupUltButton();
 
       window.addEventListener('resize', onResize);
-
-      // --- 外部3Dアセット（Soldier.glb）のダウンロード ---
       loadExternal3DAssets();
     }
 
@@ -787,7 +805,6 @@
           baseSoldierModel = gltf.scene;
           soldierAnimations = gltf.animations;
 
-          // ロード完了
           document.getElementById('loading-box').style.display = 'none';
           document.getElementById('start-btn').style.display = 'block';
           animate();
@@ -795,7 +812,7 @@
         (xhr) => {
           if (xhr.total > 0) {
             const pct = Math.floor((xhr.loaded / xhr.total) * 100);
-            document.getElementById('loading-text').innerText = `DOWNLOADING 3D ASSETS... (${pct}%)`;
+            document.getElementById('loading-text').innerText = `DEPLOYING SQUAD ASSETS... (${pct}%)`;
             document.getElementById('loading-fill').style.width = `${pct}%`;
           }
         },
@@ -870,6 +887,7 @@
         squadMembers.push({
           mesh: u.model,
           mixer: u.mixer,
+          recoil: 0,
           offsetX: 0,
           offsetZ: 0
         });
@@ -1050,6 +1068,7 @@
       gates.forEach(g => scene.remove(g.mesh));
       particles.forEach(p => scene.remove(p.mesh));
       shellCasings.forEach(sc => scene.remove(sc.mesh));
+      muzzleFlashes.forEach(mf => scene.remove(mf.mesh));
       if (boss) scene.remove(boss.mesh);
 
       squadMembers = [];
@@ -1058,6 +1077,7 @@
       gates = [];
       particles = [];
       shellCasings = [];
+      muzzleFlashes = [];
       boss = null;
 
       score = 0;
@@ -1070,13 +1090,14 @@
       playerLeaderX = 0;
       targetX = 0;
 
-      // 自軍リーダーの出撃（本物の3D兵士モデル）
+      // 自軍リーダーの出撃（銃を構えた射撃ポーズ）
       const leader = spawnSoldierInstance(true);
       leader.model.position.set(0, 0, DEFENSE_Z);
       scene.add(leader.model);
       squadMembers.push({
         mesh: leader.model,
         mixer: leader.mixer,
+        recoil: 0,
         offsetX: 0,
         offsetZ: 0
       });
@@ -1089,10 +1110,29 @@
       isPlaying = true;
     }
 
+    // 銃口マズルフラッシュ（星型クロスプレーン）
+    function spawnMuzzleFlash(x, y, z) {
+      const size = 0.35 + Math.random() * 0.15;
+      const geo = new THREE.PlaneGeometry(size, size);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xfef08a,
+        transparent: true,
+        opacity: 0.95,
+        side: THREE.DoubleSide
+      });
+      const flash = new THREE.Mesh(geo, mat);
+      flash.position.set(x, y, z);
+      flash.rotation.z = Math.random() * Math.PI;
+      scene.add(flash);
+
+      muzzleFlashes.push({ mesh: flash, life: 0.05 });
+    }
+
+    // 薬莢エジェクション
     function spawnCasing(x, y, z) {
       const casing = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.04, 0.04, 0.12, 6),
-        new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.9, roughness: 0.2 })
+        new THREE.CylinderGeometry(0.035, 0.035, 0.14, 6),
+        new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.95, roughness: 0.2 })
       );
       casing.rotation.z = Math.PI / 2;
       casing.position.set(x, y, z);
@@ -1100,13 +1140,14 @@
 
       shellCasings.push({
         mesh: casing,
-        vx: 0.08 + Math.random() * 0.05,
-        vy: 0.12 + Math.random() * 0.08,
-        vz: (Math.random() - 0.5) * 0.05,
+        vx: 0.12 + Math.random() * 0.06,
+        vy: 0.16 + Math.random() * 0.08,
+        vz: 0.05 + Math.random() * 0.05,
         life: 0.45
       });
     }
 
+    // 肉片
     function spawnMeatDebris(x, y, z, color, count = 12) {
       for (let i = 0; i < count; i++) {
         const p = new THREE.Mesh(
@@ -1126,6 +1167,7 @@
       }
     }
 
+    // 爆発スモーク
     function spawnExplosionSmoke(x, y, z, count = 25) {
       for (let i = 0; i < count; i++) {
         const isFire = Math.random() < 0.4;
@@ -1177,44 +1219,84 @@
           if (shakeIntensity < 0.01) { shakeIntensity = 0; camera.position.set(0, 16, 24); }
         }
 
-        if (muzzleLight.intensity > 0) muzzleLight.intensity -= 0.6;
+        if (muzzleLight.intensity > 0) muzzleLight.intensity -= 0.7;
 
         playerLeaderX += (targetX - playerLeaderX) * 0.22;
 
-        // 味方兵士の更新（ボーンアニメーション＆隊列移動）
+        // 味方兵士の更新（リコイル反動＋Aim姿勢）
         squadMembers.forEach(m => {
+          // 射撃反動（キックバック）の復元
+          if (m.recoil > 0) {
+            m.recoil -= delta * 12;
+            if (m.recoil < 0) m.recoil = 0;
+          }
+
+          const recoilOffsetZ = m.recoil * 0.18; // 撃つたびに後方に跳ねる！
+          const recoilRotX = -m.recoil * 0.12;  // 銃身が上に跳ね上がる！
+
           m.mesh.position.x += (playerLeaderX + m.offsetX - m.mesh.position.x) * 0.25;
-          m.mesh.position.z += (DEFENSE_Z + m.offsetZ - m.mesh.position.z) * 0.25;
+          m.mesh.position.z += (DEFENSE_Z + m.offsetZ + recoilOffsetZ - m.mesh.position.z) * 0.25;
+          m.mesh.rotation.x = recoilRotX;
+
+          // アニメーションミキサー更新（待機Aimポーズを維持）
           if (m.mixer) m.mixer.update(delta);
         });
 
-        // 射撃ロジック
+        // フルオート射撃ロジック
         shootCool -= delta;
         const cooldown = 0.13;
         if (shootCool <= 0) {
           shootCool = cooldown;
           playSfx('rifle');
 
-          muzzleLight.position.set(playerLeaderX, 1.2, DEFENSE_Z - 0.5);
-          muzzleLight.intensity = 2.4;
+          muzzleLight.position.set(playerLeaderX, 1.2, DEFENSE_Z - 0.8);
+          muzzleLight.intensity = 2.8;
 
           squadMembers.forEach(m => {
-            const b = new THREE.Mesh(
-              new THREE.SphereGeometry(0.16, 6, 6),
-              new THREE.MeshBasicMaterial({ color: 0xf59e0b })
-            );
-            b.position.set(m.mesh.position.x + 0.26, 0.75, m.mesh.position.z - 0.5);
-            scene.add(b);
+            // 反動付与
+            m.recoil = 1.0;
+
+            // 銃口の正確な3D座標
+            const muzzleX = m.mesh.position.x + 0.24;
+            const muzzleY = 0.95;
+            const muzzleZ = m.mesh.position.z - 0.6;
+
+            // 1. マズルフラッシュ星型スパーク
+            spawnMuzzleFlash(muzzleX, muzzleY, muzzleZ);
+
+            // 2. 超音速曳光弾（細長い発光トレーサー弾）
+            // 長さ1.4m、直径0.06mの細長い弾丸（X軸90度回転で奥に向かって突き進む）
+            const tracerGeo = new THREE.CylinderGeometry(0.035, 0.05, 1.4, 6);
+            tracerGeo.rotateX(Math.PI / 2);
+            const tracerMat = new THREE.MeshBasicMaterial({
+              map: tracerTexture,
+              transparent: true,
+              opacity: 0.95
+            });
+            const tracer = new THREE.Mesh(tracerGeo, tracerMat);
+            tracer.position.set(muzzleX, muzzleY, muzzleZ - 0.7);
+            scene.add(tracer);
 
             bullets.push({
-              mesh: b,
-              vz: -0.82,
+              mesh: tracer,
+              vz: -1.35, // 超音速弾速！
               vx: (Math.random() - 0.5) * 0.02,
               penetration: 2
             });
 
-            spawnCasing(m.mesh.position.x + 0.35, 0.75, m.mesh.position.z - 0.2);
+            // 3. 薬莢排出
+            spawnCasing(muzzleX + 0.15, muzzleY, muzzleZ + 0.3);
           });
+        }
+
+        // マズルフラッシュ消滅処理
+        for (let i = muzzleFlashes.length - 1; i >= 0; i--) {
+          const mf = muzzleFlashes[i];
+          mf.life -= delta;
+          if (mf.life <= 0) {
+            scene.remove(mf.mesh);
+            muzzleFlashes.splice(i, 1);
+          }
         }
 
         gateTimer -= delta;
@@ -1223,7 +1305,7 @@
           gateTimer = 8.5;
         }
 
-        // ゾンビ大群スポーン（本物のアセットモデル）
+        // ゾンビ大群スポーン
         spawnTimer -= delta;
         if (spawnTimer <= 0 && !boss) {
           const hordeCount = Math.floor(Math.random() * 3) + 3;
@@ -1256,7 +1338,7 @@
           spawnTimer = Math.max(0.35, 1.1 - gameTime * 0.015);
         }
 
-        // 巨大ボスの出現
+        // ボス出現
         if (!boss && (gameTime > 42 || score >= 180)) {
           const bObj = spawnGoliathBossInstance();
           bObj.model.position.set(0, 0, -75);
@@ -1275,7 +1357,7 @@
           playSfx('splat');
         }
 
-        // --- 1. 弾丸判定 ---
+        // --- 1. 曳光弾の移動＆着弾判定 ---
         for (let i = bullets.length - 1; i >= 0; i--) {
           const b = bullets[i];
           b.mesh.position.z += b.vz;
@@ -1290,7 +1372,7 @@
           let hit = false;
 
           for (let g of gates) {
-            if (Math.abs(b.mesh.position.z - g.mesh.position.z) < 0.6 &&
+            if (Math.abs(b.mesh.position.z - g.mesh.position.z) < 0.8 &&
                 Math.abs(b.mesh.position.x - g.mesh.position.x) < g.width / 2) {
               hit = true;
               if (g.isPos) {
@@ -1315,10 +1397,10 @@
           if (!hit) {
             for (let j = zombies.length - 1; j >= 0; j--) {
               const z = zombies[j];
-              const hitRadius = z.type === 'tank' ? 1.4 : 0.85;
+              const hitRadius = z.type === 'tank' ? 1.5 : 0.95;
 
               if (z.mesh.position.distanceTo(b.mesh.position) < hitRadius) {
-                const isCrit = Math.random() < 0.2;
+                const isCrit = Math.random() < 0.25;
                 const dmg = isCrit ? 3 : 1;
                 z.hp -= dmg;
                 b.penetration--;
@@ -1327,15 +1409,15 @@
                 chargeUlt(1.5);
                 playSfx('splat');
                 showDamageNumber(dmg, b.mesh.position.x, 1.2, b.mesh.position.z, isCrit);
-                spawnMeatDebris(b.mesh.position.x, 0.7, b.mesh.position.z, 0x5a7d65, 3);
+                spawnMeatDebris(b.mesh.position.x, 0.7, b.mesh.position.z, 0x5a7d65, 4);
 
-                // ヒットストロボフラッシュ
+                // ヒットフラッシュ
                 z.mats.forEach(mat => mat.emissive.setHex(0xffffff));
                 setTimeout(() => {
                   z.mats.forEach(mat => mat.emissive.setHex(0x000000));
                 }, 60);
 
-                z.mesh.position.z -= 0.18;
+                z.mesh.position.z -= 0.22; // 強いノックバック
 
                 if (z.hp <= 0) {
                   spawnMeatDebris(z.mesh.position.x, 0.7, z.mesh.position.z, 0xef4444, z.type === 'tank' ? 30 : 12);
