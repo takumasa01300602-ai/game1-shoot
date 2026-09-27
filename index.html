@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>ZOMBIE OUTBREAK: BRIDGE DEFENSE</title>
+  <title>Z-OUTBREAK: BRIDGE DEFENSE</title>
   <style>
     * {
       box-sizing: border-box;
@@ -18,8 +18,8 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background-color: #7dd3fc;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      background-color: #38bdf8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Impact", sans-serif;
       touch-action: none;
     }
     #game-container {
@@ -34,7 +34,20 @@
       height: 100%;
     }
 
-    /* HUD */
+    /* 映画的シネマティックビネット（画面端を暗く締めて空気感を演出） */
+    #vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      box-shadow: inset 0 0 70px rgba(15, 23, 42, 0.65), inset 0 0 140px rgba(0, 0, 0, 0.4);
+      z-index: 5;
+      transition: box-shadow 0.2s;
+    }
+    #vignette.hit {
+      box-shadow: inset 0 0 80px rgba(220, 38, 38, 0.8), inset 0 0 150px rgba(185, 28, 28, 0.6);
+    }
+
+    /* ネイティブAAA級 ミリタリーHUD */
     .hud-top {
       position: absolute;
       top: env(safe-area-inset-top, 14px);
@@ -46,31 +59,33 @@
       pointer-events: none;
       z-index: 10;
     }
-    .hud-chip {
-      background: rgba(15, 23, 42, 0.85);
-      border: 1.5px solid rgba(255, 255, 255, 0.4);
-      backdrop-filter: blur(8px);
+    .hud-badge {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.92) 0%, rgba(15, 23, 42, 0.96) 100%);
+      border: 1.5px solid rgba(255, 255, 255, 0.25);
+      border-left: 4px solid #38bdf8;
+      backdrop-filter: blur(12px);
       padding: 6px 14px;
-      border-radius: 12px;
-      color: #fff;
+      border-radius: 8px;
+      color: #f8fafc;
       font-size: 13px;
       font-weight: 900;
-      letter-spacing: 0.5px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      letter-spacing: 1px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
     }
-    #squad-text { font-size: 18px; color: #38bdf8; }
-    #score-text { font-size: 18px; color: #facc15; }
+    .hud-badge.score-badge { border-left-color: #facc15; }
+    #squad-val { font-size: 20px; color: #38bdf8; text-shadow: 0 0 8px rgba(56, 189, 248, 0.5); }
+    #score-val { font-size: 20px; color: #facc15; text-shadow: 0 0 8px rgba(250, 204, 21, 0.5); }
 
-    /* ボスHUD */
+    /* ボスHPバー */
     #boss-hud {
       position: absolute;
-      top: calc(env(safe-area-inset-top, 14px) + 52px);
+      top: calc(env(safe-area-inset-top, 14px) + 54px);
       left: 50%;
       transform: translateX(-50%);
-      width: 82%;
+      width: 84%;
       max-width: 360px;
       display: none;
       flex-direction: column;
@@ -78,31 +93,36 @@
       z-index: 10;
       pointer-events: none;
     }
-    #boss-name {
-      font-size: 12px;
+    #boss-label {
+      font-size: 11px;
       font-weight: 900;
-      color: #dc2626;
+      color: #ef4444;
       letter-spacing: 2px;
       margin-bottom: 4px;
-      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+      text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+      animation: pulseAlert 0.8s infinite alternate;
     }
-    .boss-hp-frame {
+    @keyframes pulseAlert {
+      from { transform: scale(1); opacity: 0.85; }
+      to { transform: scale(1.05); opacity: 1; }
+    }
+    .boss-bar-wrap {
       width: 100%;
-      height: 12px;
-      background: rgba(0, 0, 0, 0.7);
-      border: 2px solid #dc2626;
+      height: 14px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 2px solid #ef4444;
       border-radius: 6px;
       overflow: hidden;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+      box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
     }
-    #boss-hp-fill {
+    #boss-bar-fill {
       width: 100%;
       height: 100%;
       background: linear-gradient(90deg, #f87171, #dc2626);
       transition: width 0.08s linear;
     }
 
-    /* 空爆ボタン */
+    /* 空爆支援ボタン */
     #ult-btn {
       position: absolute;
       bottom: calc(env(safe-area-inset-bottom, 16px) + 20px);
@@ -111,7 +131,7 @@
       height: 76px;
       border-radius: 50%;
       background: radial-gradient(circle, #334155, #0f172a);
-      border: 2.5px solid #64748b;
+      border: 3px solid #64748b;
       color: #94a3b8;
       display: flex;
       flex-direction: column;
@@ -119,9 +139,9 @@
       align-items: center;
       font-weight: 900;
       font-size: 10px;
-      letter-spacing: 0.5px;
+      letter-spacing: 1px;
       z-index: 20;
-      box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
       transition: all 0.2s;
       outline: none;
     }
@@ -129,11 +149,11 @@
       border-color: #ef4444;
       color: #fff;
       background: radial-gradient(circle, #b91c1c, #7f1d1d);
-      box-shadow: 0 0 25px rgba(239, 68, 68, 0.8);
-      animation: pulseAlert 0.8s infinite alternate;
+      box-shadow: 0 0 30px rgba(239, 68, 68, 0.9);
+      animation: pulseBtn 0.9s infinite alternate;
       cursor: pointer;
     }
-    @keyframes pulseAlert {
+    @keyframes pulseBtn {
       from { transform: scale(1); }
       to { transform: scale(1.08); }
     }
@@ -149,25 +169,25 @@
     }
     .dmg-num {
       position: absolute;
-      font-size: 15px;
+      font-size: 16px;
       font-weight: 900;
       color: #ffffff;
-      text-shadow: 0 1px 4px #000, 0 0 8px rgba(0,0,0,0.8);
+      text-shadow: 0 2px 4px #000, 0 0 8px rgba(0,0,0,0.9);
       pointer-events: none;
       transition: transform 0.6s cubic-bezier(0.1, 0.8, 0.2, 1), opacity 0.6s;
     }
     .dmg-num.crit {
-      font-size: 22px;
+      font-size: 24px;
       color: #facc15;
-      text-shadow: 0 2px 6px #000;
+      text-shadow: 0 2px 6px #000, 0 0 12px #eab308;
     }
 
     /* 画面オーバーレイ */
     .screen-overlay {
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.85) 0%, rgba(2, 6, 23, 0.94) 100%);
-      backdrop-filter: blur(10px);
+      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.88) 0%, rgba(2, 6, 23, 0.96) 100%);
+      backdrop-filter: blur(14px);
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -177,12 +197,12 @@
       text-align: center;
     }
     .screen-title {
-      font-size: 32px;
+      font-size: 34px;
       font-weight: 900;
       letter-spacing: 2px;
       margin-bottom: 12px;
       color: #ffffff;
-      text-shadow: 0 4px 15px rgba(0,0,0,0.8);
+      text-shadow: 0 4px 20px rgba(0,0,0,0.9);
     }
     .screen-desc {
       font-size: 13px;
@@ -192,14 +212,14 @@
       margin-bottom: 28px;
     }
     .btn-main {
-      padding: 16px 44px;
-      font-size: 17px;
+      padding: 16px 46px;
+      font-size: 18px;
       font-weight: 900;
       border: none;
       border-radius: 40px;
       background: linear-gradient(135deg, #15803d, #22c55e);
       color: #fff;
-      box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
+      box-shadow: 0 8px 25px rgba(34, 197, 94, 0.5);
       cursor: pointer;
       outline: none;
       letter-spacing: 1px;
@@ -211,7 +231,7 @@
       position: absolute;
       inset: 0;
       background: rgba(15, 23, 42, 0.92);
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(14px);
       display: none;
       flex-direction: column;
       justify-content: center;
@@ -227,20 +247,20 @@
       max-width: 320px;
     }
     .up-card {
-      background: rgba(30, 41, 59, 0.9);
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95));
       border: 2px solid #64748b;
       border-radius: 14px;
       padding: 14px 18px;
       text-align: left;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.45);
       transition: transform 0.15s, border-color 0.15s;
     }
     .up-card:active { transform: scale(0.96); border-color: #22c55e; }
     .up-title { font-size: 16px; font-weight: 900; color: #facc15; margin-bottom: 4px; }
     .up-desc { font-size: 12px; color: #cbd5e1; line-height: 1.4; }
 
-    #error-log {
+    #error-box {
       position: absolute;
       bottom: 8px; left: 8px; right: 8px;
       color: #ff4d4d; font-size: 10px; background: rgba(0,0,0,0.85);
@@ -253,25 +273,26 @@
 </head>
 <body>
   <div id="game-container">
-    <div id="error-log"></div>
+    <div id="vignette"></div>
+    <div id="error-box"></div>
     <div id="damage-layer"></div>
 
     <div class="hud-top">
-      <div class="hud-chip">
+      <div class="hud-badge">
         <span>SQUAD:</span>
-        <span id="squad-text">1</span>
+        <span id="squad-val">1</span>
       </div>
-      <div class="hud-chip">
+      <div class="hud-badge score-badge">
         <span>KILLS:</span>
-        <span id="score-text">0</span>
+        <span id="score-val">0</span>
       </div>
     </div>
 
-    <!-- ボスHPバー -->
+    <!-- ボスHUD -->
     <div id="boss-hud">
-      <div id="boss-name">⚠ TARGET: MUTANT GOLIATH ⚠</div>
-      <div class="boss-hp-frame">
-        <div id="boss-hp-fill"></div>
+      <div id="boss-label">⚠ WARNING: MUTANT GOLIATH ⚠</div>
+      <div class="boss-bar-wrap">
+        <div id="boss-bar-fill"></div>
       </div>
     </div>
 
@@ -281,28 +302,28 @@
       <span id="ult-pct">0%</span>
     </button>
 
-    <!-- アップグレード選択 -->
+    <!-- アップグレード画面 -->
     <div id="upgrade-screen">
-      <h2 style="color: #facc15; font-size: 20px; font-weight: 900; margin-bottom: 6px; letter-spacing: 1px;">TACTICAL AIR-DROP</h2>
+      <h2 style="color: #facc15; font-size: 20px; font-weight: 900; margin-bottom: 6px; letter-spacing: 1px;">TACTICAL REINFORCEMENT</h2>
       <p style="color: #cbd5e1; font-size: 12px; margin-bottom: 18px;">補給物資を選択してください</p>
       <div id="upgrade-cards"></div>
     </div>
 
     <!-- スタート画面 -->
     <div id="start-screen" class="screen-overlay">
-      <h1 class="screen-title">DEAD BRIDGE: OUTBREAK</h1>
+      <h1 class="screen-title">DEAD BRIDGE: OVERKILL</h1>
       <p class="screen-desc">
-        <b>【ゾンビ大群・防衛迎撃戦】</b><br>
-        晴天のベイブリッジに押し寄せる<b>無数のゾンビの大群</b>を撃滅せよ！<br>
-        作戦ゲートを撃って味方小隊を増やし、弾幕でミンチにせよ。<br>
-        空爆ゲージMAXで<b>絨毯爆撃</b>を投下可能！
+        <b>【AAA級グラフィック・ゾンビサバイバー】</b><br>
+        晴天の巨大ベイブリッジを埋め尽くす<b>数十体のゾンビ大群</b>を撃滅せよ！<br>
+        ゲートを撃ち抜いて部隊を大増殖させ、一斉掃射！<br>
+        ゲージMAXで<b>超音速ジェット爆撃</b>を要請せよ。
       </p>
-      <button id="start-btn" class="btn-main">DEFEND THE BRIDGE</button>
+      <button id="start-btn" class="btn-main">ENGAGE HORDE</button>
     </div>
 
     <!-- リザルト画面 -->
     <div id="result-screen" class="screen-overlay" style="display: none;">
-      <h1 id="result-title" class="screen-title">OUTBREAK CONTAINED</h1>
+      <h1 id="result-title" class="screen-title">SECTOR SECURED</h1>
       <p id="result-desc" class="screen-desc"></p>
       <button id="retry-btn" class="btn-main">REDEPLOY</button>
     </div>
@@ -310,12 +331,12 @@
 
   <script>
     window.onerror = function(msg, url, line) {
-      const el = document.getElementById('error-log');
+      const el = document.getElementById('error-box');
       el.style.display = 'block';
       el.innerText = `Line ${line}: ${msg}`;
     };
 
-    // --- Web Audio リアルミリタリー音響 ---
+    // --- Web Audio リアル音響 ---
     let audioCtx = null;
     let bgmStep = 0;
     let bgmTimer = 0;
@@ -325,11 +346,11 @@
       if (audioCtx.state === 'suspended') audioCtx.resume();
     }
 
-    // 軍用マーチングドラム
     function stepBgm() {
       if (!audioCtx || !isPlaying) return;
       const now = audioCtx.currentTime;
 
+      // スネアノイズ
       const bufferSize = audioCtx.sampleRate * 0.05;
       const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
       const data = buffer.getChannelData(0);
@@ -351,6 +372,7 @@
       gain.connect(audioCtx.destination);
       noise.start(now);
 
+      // バスドラム
       if (bgmStep % 4 === 0) {
         const kOsc = audioCtx.createOscillator();
         const kGain = audioCtx.createGain();
@@ -370,8 +392,6 @@
       if (!audioCtx) return;
       try {
         const now = audioCtx.currentTime;
-
-        // 実銃アサルトライフル発砲音
         if (type === 'rifle') {
           const bufferSize = audioCtx.sampleRate * 0.07;
           const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
@@ -381,7 +401,7 @@
           const noise = audioCtx.createBufferSource();
           noise.buffer = buffer;
           const gain = audioCtx.createGain();
-          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.setValueAtTime(0.13, now);
           gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
 
           const osc = audioCtx.createOscillator();
@@ -396,13 +416,10 @@
           gain.connect(audioCtx.destination);
           osc.connect(oGain);
           oGain.connect(audioCtx.destination);
-
           noise.start(now);
           osc.start(now);
           osc.stop(now + 0.07);
-        }
-        // ゾンビ肉弾着音（スプラッター・ミートヒット）
-        else if (type === 'splat') {
+        } else if (type === 'splat') {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.type = 'sawtooth';
@@ -414,24 +431,7 @@
           gain.connect(audioCtx.destination);
           osc.start(now);
           osc.stop(now + 0.07);
-        }
-        // ゾンビの唸り声 / 咆哮
-        else if (type === 'groan') {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(75, now);
-          osc.frequency.linearRampToValueAtTime(95, now + 0.2);
-          osc.frequency.linearRampToValueAtTime(50, now + 0.5);
-          gain.gain.setValueAtTime(0.15, now);
-          gain.gain.linearRampToValueAtTime(0.001, now + 0.5);
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start(now);
-          osc.stop(now + 0.5);
-        }
-        // 爆発音
-        else if (type === 'explosion') {
+        } else if (type === 'explosion') {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.type = 'sawtooth';
@@ -443,9 +443,7 @@
           gain.connect(audioCtx.destination);
           osc.start(now);
           osc.stop(now + 0.45);
-        }
-        // 空爆ジェット音
-        else if (type === 'airstrike') {
+        } else if (type === 'airstrike') {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.type = 'sawtooth';
@@ -473,11 +471,9 @@
     let waveCount = 1;
     let shakeIntensity = 0;
 
-    // 空爆ゲージ
     let ultGauge = 0;
     let isUltReady = false;
 
-    // アップグレード
     let fireRateMult = 1.0;
     let hasArmorPiercing = false;
     let hasGunshipSupport = false;
@@ -485,66 +481,87 @@
 
     // Three.js
     let scene, camera, renderer;
+    let sunLight;
     let playerLeaderX = 0;
     let targetX = 0;
     let roadMatRef, waterMatRef;
 
-    // オブジェクト配列
     let squadMembers = [];
     let bullets = [];
-    let zombies = []; // ゾンビの大群
+    let zombies = [];
     let gates = [];
     let particles = [];
     let shellCasings = [];
     let boss = null;
 
-    // --- テクスチャ生成 ---
-    // アスファルト舗装道路
+    // --- 高精細テクスチャ生成 ---
     function createRoadTexture() {
+      const cvs = document.createElement('canvas');
+      cvs.width = 1024; cvs.height = 1024;
+      const ctx = cvs.getContext('2d');
+
+      // 濃いアスファルト
+      ctx.fillStyle = '#22252a';
+      ctx.fillRect(0, 0, 1024, 1024);
+
+      // ざらつき・汚れ
+      for (let i = 0; i < 9000; i++) {
+        ctx.fillStyle = Math.random() < 0.5 ? '#1a1c20' : '#2d3138';
+        ctx.fillRect(Math.random() * 1024, Math.random() * 1024, 3, 3);
+      }
+
+      // タイヤ痕（ブレーキ痕）
+      ctx.fillStyle = 'rgba(10, 10, 12, 0.4)';
+      for (let i = 0; i < 8; i++) {
+        const tx = 200 + Math.random() * 624;
+        ctx.fillRect(tx, Math.random() * 800, 36, 120 + Math.random() * 80);
+      }
+
+      // 白の路肩サイドライン
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(24, 0, 16, 1024);
+      ctx.fillRect(984, 0, 16, 1024);
+
+      // 黄色のセンターダブルライン
+      ctx.fillStyle = '#f59e0b';
+      for (let y = 20; y < 1024; y += 140) {
+        ctx.fillRect(504, y, 10, 80);
+        ctx.fillRect(520, y, 10, 80);
+      }
+
+      const tex = new THREE.CanvasTexture(cvs);
+      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(1, 16);
+      return tex;
+    }
+
+    function createWaterTexture() {
       const cvs = document.createElement('canvas');
       cvs.width = 512; cvs.height = 512;
       const ctx = cvs.getContext('2d');
-      ctx.fillStyle = '#2b2d31';
+
+      ctx.fillStyle = '#0284c7';
       ctx.fillRect(0, 0, 512, 512);
 
-      for (let i = 0; i < 4000; i++) {
-        ctx.fillStyle = Math.random() < 0.5 ? '#1f2024' : '#383a40';
-        ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+      // 波紋ハイライト
+      for (let i = 0; i < 240; i++) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        const w = 30 + Math.random() * 70;
+        ctx.fillRect(Math.random() * 512, Math.random() * 512, w, 5);
       }
 
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillRect(16, 0, 10, 512);
-      ctx.fillRect(486, 0, 10, 512);
-
-      ctx.fillStyle = '#f59e0b';
-      for (let y = 10; y < 512; y += 80) {
-        ctx.fillRect(250, y, 6, 45);
-        ctx.fillRect(258, y, 6, 45);
-      }
-      return new THREE.CanvasTexture(cvs);
+      const tex = new THREE.CanvasTexture(cvs);
+      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(16, 32);
+      return tex;
     }
 
-    // きらめく海面
-    function createWaterTexture() {
-      const cvs = document.createElement('canvas');
-      cvs.width = 256; cvs.height = 256;
-      const ctx = cvs.getContext('2d');
-      ctx.fillStyle = '#0284c7';
-      ctx.fillRect(0, 0, 256, 256);
-      for (let i = 0; i < 120; i++) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-        const w = 20 + Math.random() * 40;
-        ctx.fillRect(Math.random() * 256, Math.random() * 256, w, 4);
-      }
-      return new THREE.CanvasTexture(cvs);
-    }
-
-    // 軍用作戦ゲート
     function createMilGateTexture(label, isPos) {
       const cvs = document.createElement('canvas');
       cvs.width = 256; cvs.height = 256;
       const ctx = cvs.getContext('2d');
-      ctx.fillStyle = isPos ? 'rgba(30, 58, 138, 0.85)' : 'rgba(127, 29, 29, 0.85)';
+
+      ctx.fillStyle = isPos ? 'rgba(30, 58, 138, 0.88)' : 'rgba(127, 29, 29, 0.88)';
       ctx.fillRect(0, 0, 256, 256);
 
       ctx.strokeStyle = isPos ? '#38bdf8' : '#f87171';
@@ -557,156 +574,214 @@
       ctx.fillText(isPos ? 'AIR-DROP' : 'HAZARD', 128, 50);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '900 84px -apple-system, sans-serif';
+      ctx.font = '900 84px Impact, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(label, 128, 140);
       return new THREE.CanvasTexture(cvs);
     }
 
-    // --- 3Dモデル生成 ---
-    // 現代兵士（味方特殊部隊）
+    // --- 高精細PBR 3Dモデル ---
+    // 現代兵士（PBR + シャドウ）
     function createSoldierModel(isLeader = false) {
       const g = new THREE.Group();
 
-      const vestColor = isLeader ? 0x1e3a8a : 0x78716c;
-      const camoColor = isLeader ? 0x475569 : 0xa8a29e;
-      const helmetColor = isLeader ? 0x1e293b : 0x57534e;
+      const vestMat = new THREE.MeshStandardMaterial({
+        color: isLeader ? 0x1e3a8a : 0x57534e,
+        roughness: 0.7,
+        metalness: 0.1
+      });
+      const camoMat = new THREE.MeshStandardMaterial({
+        color: isLeader ? 0x334155 : 0x78716c,
+        roughness: 0.8,
+        metalness: 0.05
+      });
+      const armorMat = new THREE.MeshStandardMaterial({
+        color: isLeader ? 0x0f172a : 0x292524,
+        roughness: 0.5,
+        metalness: 0.3
+      });
 
       // プレートキャリア
-      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.65, 0.4), new THREE.MeshLambertMaterial({ color: vestColor }));
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.65, 0.4), vestMat);
       torso.position.y = 0.55;
+      torso.castShadow = true;
       g.add(torso);
 
-      // 腕（ライフル構え）
-      const armMat = new THREE.MeshLambertMaterial({ color: camoColor });
-      const armL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.5, 0.2), armMat);
+      // マガジンポーチ×3
+      for (let p = -1; p <= 1; p++) {
+        const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, 0.08), armorMat);
+        pouch.position.set(p * 0.16, 0.45, -0.22);
+        pouch.castShadow = true;
+        g.add(pouch);
+      }
+
+      // 腕
+      const armL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.5, 0.2), camoMat);
       armL.position.set(-0.35, 0.6, 0.05);
+      armL.castShadow = true;
       const armR = armL.clone();
       armR.position.x = 0.35;
       armR.rotation.x = -Math.PI / 6;
       g.add(armL, armR);
 
-      // ヘルメット＆ゴーグル
-      const helmet = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.38, 0.44), new THREE.MeshLambertMaterial({ color: helmetColor }));
-      helmet.position.y = 1.08;
-      const goggle = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.12, 0.08), new THREE.MeshLambertMaterial({ color: 0x0f172a }));
+      // タクティカルヘルメット
+      const helmet = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.32, 10), armorMat);
+      helmet.position.y = 1.1;
+      helmet.castShadow = true;
+
+      // ゴーグル
+      const goggle = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.12, 0.08), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1, metalness: 0.9 }));
       goggle.position.set(0, 1.08, -0.22);
       g.add(helmet, goggle);
 
-      // アサルトライフル
-      const gunMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+      // M4カービン銃
+      const gunMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.3, metalness: 0.8 });
       const gun = new THREE.Group();
       const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 0.65), gunMat);
       const mag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, 0.12), gunMat);
       mag.position.set(0, -0.12, -0.05);
-      gun.add(barrel, mag);
+      const sight = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.12), gunMat);
+      sight.position.set(0, 0.08, 0);
+      gun.add(barrel, mag, sight);
       gun.position.set(0.28, 0.6, -0.3);
+      gun.castShadow = true;
       g.add(gun);
 
+      // マズルフラッシュプレーン
+      const flashMat = new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0 });
+      const flash = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 0.45), flashMat);
+      flash.position.set(0.28, 0.6, -0.7);
+      g.add(flash);
+
       // 脚
-      const legMat = new THREE.MeshLambertMaterial({ color: camoColor });
-      const legL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.35, 0.22), legMat);
+      const legL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.35, 0.22), camoMat);
       legL.position.set(-0.16, 0.18, 0);
+      legL.castShadow = true;
       const legR = legL.clone();
       legR.position.x = 0.16;
       g.add(legL, legR);
 
-      return { group: g, legL, legR };
+      return { group: g, legL, legR, flash, flashMat };
     }
 
-    // ゾンビモデル（腕を突き出し前進するポーズ）
+    // ゾンビ（PBR + ヒットフラッシュ対応）
     function createZombieModel(type = 'normal') {
       const g = new THREE.Group();
 
-      let skinColor = 0x5a7d65; // 腐敗した緑がかった肌
-      let clothesColor = 0x52525b; // ボロボロの服
+      let skinCol = 0x5a7d65;
+      let clothCol = 0x3f3f46;
       let scale = 1.0;
 
       if (type === 'runner') {
-        skinColor = 0x718355;
-        clothesColor = 0xb91c1c; // 赤い服の狂暴ランナー
-        scale = 0.85;
+        skinCol = 0x718355;
+        clothCol = 0x991b1b;
+        scale = 0.88;
       } else if (type === 'tank') {
-        skinColor = 0x3f4f44;
-        clothesColor = 0x27272a;
-        scale = 1.6; // 巨大マッチョゾンビ
+        skinCol = 0x374151;
+        clothCol = 0x18181b;
+        scale = 1.65;
       }
 
-      // 胴体
-      const torso = new THREE.Mesh(
-        new THREE.BoxGeometry(0.55 * scale, 0.65 * scale, 0.4 * scale),
-        new THREE.MeshLambertMaterial({ color: clothesColor })
-      );
+      const skinMat = new THREE.MeshStandardMaterial({
+        color: skinCol,
+        roughness: 0.85,
+        metalness: 0.05,
+        emissive: 0x000000
+      });
+      const clothMat = new THREE.MeshStandardMaterial({
+        color: clothCol,
+        roughness: 0.9,
+        metalness: 0.05,
+        emissive: 0x000000
+      });
+
+      // トルソー
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.55 * scale, 0.65 * scale, 0.4 * scale), clothMat);
       torso.position.y = 0.55 * scale;
+      torso.castShadow = true;
       g.add(torso);
 
-      // 突き出された両腕（ゾンビポーズ）
-      const armMat = new THREE.MeshLambertMaterial({ color: skinColor });
-      const armGeo = new THREE.BoxGeometry(0.16 * scale, 0.16 * scale, 0.6 * scale);
-      const armL = new THREE.Mesh(armGeo, armMat);
+      // 突き出された腕
+      const armGeo = new THREE.BoxGeometry(0.16 * scale, 0.16 * scale, 0.65 * scale);
+      const armL = new THREE.Mesh(armGeo, skinMat);
       armL.position.set(-0.35 * scale, 0.7 * scale, 0.3 * scale);
+      armL.castShadow = true;
       const armR = armL.clone();
       armR.position.x = 0.35 * scale;
       g.add(armL, armR);
 
       // 頭部
-      const headMat = new THREE.MeshLambertMaterial({ color: skinColor });
-      const head = new THREE.Mesh(new THREE.BoxGeometry(0.4 * scale, 0.4 * scale, 0.4 * scale), headMat);
-      head.position.y = 1.05 * scale;
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.42 * scale, 0.42 * scale, 0.42 * scale), skinMat);
+      head.position.y = 1.08 * scale;
+      head.castShadow = true;
 
-      // 血走った赤い目
-      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+      // 赤い目
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0033 });
       const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.08 * scale, 0.08 * scale, 0.05 * scale), eyeMat);
-      eyeL.position.set(-0.1 * scale, 1.08 * scale, 0.21 * scale);
+      eyeL.position.set(-0.1 * scale, 1.1 * scale, 0.22 * scale);
       const eyeR = eyeL.clone();
       eyeR.position.x = 0.1 * scale;
       g.add(head, eyeL, eyeR);
 
       // 脚
-      const legMat = new THREE.MeshLambertMaterial({ color: 0x3f3f46 });
-      const legL = new THREE.Mesh(new THREE.BoxGeometry(0.18 * scale, 0.35 * scale, 0.22 * scale), legMat);
+      const legL = new THREE.Mesh(new THREE.BoxGeometry(0.18 * scale, 0.35 * scale, 0.22 * scale), clothMat);
       legL.position.set(-0.16 * scale, 0.18 * scale, 0);
+      legL.castShadow = true;
       const legR = legL.clone();
       legR.position.x = 0.16 * scale;
       g.add(legL, legR);
 
-      // ランナーは前傾姿勢
-      if (type === 'runner') {
-        g.rotation.x = 0.3;
-      }
+      if (type === 'runner') g.rotation.x = 0.35; // 前傾疾走
 
-      return { group: g, legL, legR, scale };
+      return { group: g, legL, legR, skinMat, clothMat, scale };
     }
 
     // 巨大変異体ボス（GOLIATH）
     function createGoliathBoss() {
       const g = new THREE.Group();
-      const skinMat = new THREE.MeshLambertMaterial({ color: 0x374151 }); // 灰色の強靭な肉体
+      const skinMat = new THREE.MeshStandardMaterial({
+        color: 0x1f2937,
+        roughness: 0.9,
+        metalness: 0.1,
+        emissive: 0x000000
+      });
 
-      // 巨大トルソー
+      // トルソー
       const body = new THREE.Mesh(new THREE.BoxGeometry(3.6, 3.8, 2.6), skinMat);
       body.position.y = 2.8;
+      body.castShadow = true;
       g.add(body);
 
-      // 太い丸太のような腕
+      // 背中の変異骨棘（スパイク）
+      const spikeMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.4 });
+      for (let s = 0; s < 4; s++) {
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.3, 1.6, 5), spikeMat);
+        spike.rotation.x = -Math.PI / 3;
+        spike.position.set((s - 1.5) * 0.9, 3.8, -1.2);
+        spike.castShadow = true;
+        g.add(spike);
+      }
+
+      // 巨腕
       const armGeo = new THREE.BoxGeometry(1.2, 1.2, 3.2);
       const armL = new THREE.Mesh(armGeo, skinMat);
       armL.position.set(-2.4, 3.2, 1.4);
+      armL.castShadow = true;
       const armR = armL.clone();
       armR.position.x = 2.4;
       g.add(armL, armR);
 
-      // 醜悪な頭部
+      // 頭部
       const head = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.8, 1.8), skinMat);
       head.position.y = 5.2;
+      head.castShadow = true;
 
-      // 輝く赤い目
       const eye = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 0.1), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
       eye.position.set(0, 5.2, 0.95);
       g.add(head, eye);
 
-      return g;
+      return { group: g, skinMat };
     }
 
     // --- 初期セットアップ ---
@@ -716,77 +791,104 @@
       const h = container.clientHeight;
 
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x7dd3fc); // 快晴の青空
-      scene.fog = new THREE.FogExp2(0xbae6fd, 0.008);
+      scene.background = new THREE.Color(0x38bdf8); // 快晴の青空
+      scene.fog = new THREE.FogExp2(0xbae6fd, 0.007);
 
-      camera = new THREE.PerspectiveCamera(54, w / h, 0.1, 300);
+      camera = new THREE.PerspectiveCamera(52, w / h, 0.1, 300);
       camera.position.set(0, 16, 24);
       camera.lookAt(0, 1, 0);
 
-      renderer = new THREE.WebGLRenderer({ antialias: true });
+      // レンダラー設定（ACESFilmicToneMapping + PCFSoftShadowMap）
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
       renderer.setSize(w, h);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap; // 柔らかな映画的落ち影
+      renderer.toneMapping = THREE.ACESFilmicToneMapping; // シネマティックトーン
+      renderer.toneMappingExposure = 1.25;
       container.appendChild(renderer.domElement);
 
-      // 太陽光ライティング
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
-      scene.add(ambientLight);
+      // ライティング（太陽光＋大気光照り返し）
+      const hemiLight = new THREE.HemisphereLight(0xbae6fd, 0x0284c7, 0.75);
+      scene.add(hemiLight);
 
-      const sunLight = new THREE.DirectionalLight(0xfffbeb, 1.2);
-      sunLight.position.set(15, 35, 20);
+      sunLight = new THREE.DirectionalLight(0xfffbeb, 1.45);
+      sunLight.position.set(18, 38, 15);
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.width = 2048;
+      sunLight.shadow.mapSize.height = 2048;
+      sunLight.shadow.camera.near = 0.5;
+      sunLight.shadow.camera.far = 160;
+      sunLight.shadow.camera.left = -16;
+      sunLight.shadow.camera.right = 16;
+      sunLight.shadow.camera.top = 25;
+      sunLight.shadow.camera.bottom = -45;
+      sunLight.shadow.bias = -0.0004;
       scene.add(sunLight);
 
-      // 1. 海面
-      const waterTex = createWaterTexture();
-      waterTex.wrapS = THREE.RepeatWrapping; waterTex.wrapT = THREE.RepeatWrapping;
-      waterTex.repeat.set(16, 32);
-      waterMatRef = waterTex;
-      const sea = new THREE.Mesh(new THREE.PlaneGeometry(300, 400), new THREE.MeshLambertMaterial({ map: waterTex }));
+      // 1. エメラルドグリーンの鏡面海面
+      waterMatRef = createWaterTexture();
+      const seaMat = new THREE.MeshStandardMaterial({
+        map: waterMatRef,
+        roughness: 0.18,
+        metalness: 0.8,
+        color: 0x0284c7
+      });
+      const sea = new THREE.Mesh(new THREE.PlaneGeometry(300, 400), seaMat);
       sea.rotation.x = -Math.PI / 2;
       sea.position.set(0, -18, -40);
+      sea.receiveShadow = true;
       scene.add(sea);
 
-      // 2. ベイブリッジ（アスファルト）
-      const roadTex = createRoadTexture();
-      roadTex.wrapS = THREE.RepeatWrapping; roadTex.wrapT = THREE.RepeatWrapping;
-      roadTex.repeat.set(1, 16);
-      roadMatRef = roadTex;
-
-      const road = new THREE.Mesh(new THREE.BoxGeometry(BRIDGE_WIDTH, 1.0, 130), new THREE.MeshLambertMaterial({ map: roadTex }));
+      // 2. ベイブリッジ（高精細アスファルト）
+      roadMatRef = createRoadTexture();
+      const roadMat = new THREE.MeshStandardMaterial({
+        map: roadMatRef,
+        roughness: 0.82,
+        metalness: 0.1
+      });
+      const road = new THREE.Mesh(new THREE.BoxGeometry(BRIDGE_WIDTH, 1.0, 130), roadMat);
       road.position.set(0, -0.5, -35);
+      road.receiveShadow = true;
       scene.add(road);
 
-      // 3. ガードレール
-      const railMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
+      // 3. 金属ガードレール
+      const railMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.4, metalness: 0.7 });
       const railL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.7, 130), railMat);
       railL.position.set(-BRIDGE_WIDTH / 2, 0.35, -35);
+      railL.castShadow = true; railL.receiveShadow = true;
       const railR = railL.clone();
       railR.position.x = BRIDGE_WIDTH / 2;
       scene.add(railL, railR);
 
-      // 4. 吊り橋の主塔タワー
-      const towerMat = new THREE.MeshLambertMaterial({ color: 0xe2e8f0 });
+      // 4. 吊り橋の巨大主塔（タワー）＆トラス構造
+      const towerMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.6, metalness: 0.2 });
       for (let z of [-80, -20]) {
-        const pillarL = new THREE.Mesh(new THREE.BoxGeometry(1.2, 45, 1.8), towerMat);
-        pillarL.position.set(-BRIDGE_WIDTH / 2 - 1.2, 20, z);
+        const pillarL = new THREE.Mesh(new THREE.BoxGeometry(1.4, 48, 1.8), towerMat);
+        pillarL.position.set(-BRIDGE_WIDTH / 2 - 1.2, 22, z);
+        pillarL.castShadow = true;
         const pillarR = pillarL.clone();
         pillarR.position.x = BRIDGE_WIDTH / 2 + 1.2;
         const beam = new THREE.Mesh(new THREE.BoxGeometry(BRIDGE_WIDTH + 4, 1.8, 1.8), towerMat);
-        beam.position.set(0, 38, z);
+        beam.position.set(0, 42, z);
+        beam.castShadow = true;
         scene.add(pillarL, pillarR, beam);
       }
 
       // 吊り橋ケーブル
-      const cableMat = new THREE.MeshBasicMaterial({ color: 0x64748b });
+      const cableMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.3, metalness: 0.8 });
       const cableL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 130), cableMat);
       cableL.rotation.x = Math.PI / 2;
-      cableL.position.set(-BRIDGE_WIDTH / 2 - 1.2, 38, -35);
+      cableL.position.set(-BRIDGE_WIDTH / 2 - 1.2, 42, -35);
       const cableR = cableL.clone();
       cableR.position.x = BRIDGE_WIDTH / 2 + 1.2;
       scene.add(cableL, cableR);
 
       // 防衛境界ライン
-      const defLine = new THREE.Mesh(new THREE.BoxGeometry(BRIDGE_WIDTH, 0.06, 0.4), new THREE.MeshLambertMaterial({ color: 0xfacc15 }));
+      const defLine = new THREE.Mesh(
+        new THREE.BoxGeometry(BRIDGE_WIDTH, 0.06, 0.4),
+        new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 })
+      );
       defLine.position.set(0, 0.05, DEFENSE_Z + 1.2);
       scene.add(defLine);
 
@@ -838,7 +940,7 @@
 
     // --- 部隊編成 ---
     function updateSquadLayout() {
-      document.getElementById('squad-text').innerText = squadMembers.length;
+      document.getElementById('squad-val').innerText = squadMembers.length;
       squadMembers.forEach((m, idx) => {
         if (idx === 0) { m.offsetX = 0; m.offsetZ = 0; return; }
         const row = Math.floor(Math.sqrt(idx));
@@ -858,7 +960,14 @@
         u.group.position.set(playerLeaderX, 0, DEFENSE_Z);
         u.group.scale.set(0.1, 0.1, 0.1);
         scene.add(u.group);
-        squadMembers.push({ mesh: u.group, legL: u.legL, legR: u.legR, offsetX: 0, offsetZ: 0 });
+        squadMembers.push({
+          mesh: u.group,
+          legL: u.legL,
+          legR: u.legR,
+          flashMat: u.flashMat,
+          offsetX: 0,
+          offsetZ: 0
+        });
       }
       updateSquadLayout();
     }
@@ -867,10 +976,16 @@
       if (squadMembers.length <= 1) return;
       playSfx('splat');
       shakeIntensity = 0.45;
+
+      // 画面赤フラッシュ（被弾ビネット）
+      const vig = document.getElementById('vignette');
+      vig.classList.add('hit');
+      setTimeout(() => vig.classList.remove('hit'), 200);
+
       const removeCnt = Math.min(cnt, squadMembers.length - 1);
       for (let i = 0; i < removeCnt; i++) {
         const m = squadMembers.pop();
-        spawnMeatDebris(m.mesh.position.x, 0.6, m.mesh.position.z, 0xef4444, 8);
+        spawnMeatDebris(m.mesh.position.x, 0.6, m.mesh.position.z, 0xef4444, 10);
         scene.remove(m.mesh);
       }
       updateSquadLayout();
@@ -896,12 +1011,14 @@
       panel.position.y = 1.5;
       g.add(panel);
 
-      const frameMat = new THREE.MeshLambertMaterial({ color: 0x334155 });
+      const frameMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.4 });
       const pL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.2, 0.3), frameMat);
       pL.position.set(-width / 2, 1.5, 0);
+      pL.castShadow = true;
       const pR = pL.clone(); pR.position.x = width / 2;
       const topBar = new THREE.Mesh(new THREE.BoxGeometry(width + 0.3, 0.3, 0.3), frameMat);
       topBar.position.set(0, 3.0, 0);
+      topBar.castShadow = true;
       g.add(pL, pR, topBar);
 
       g.position.set(x, 0, z);
@@ -950,12 +1067,16 @@
       updateUltUi();
 
       playSfx('airstrike');
-      shakeIntensity = 1.3;
+      shakeIntensity = 1.35;
 
-      // ジェット戦闘機通過
-      const jet = new THREE.Mesh(new THREE.ConeGeometry(0.8, 4.0, 4), new THREE.MeshLambertMaterial({ color: 0x475569 }));
+      // ジェット戦闘機
+      const jet = new THREE.Mesh(
+        new THREE.ConeGeometry(0.9, 4.2, 4),
+        new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.6, roughness: 0.3 })
+      );
       jet.rotation.x = Math.PI / 2;
       jet.position.set(playerLeaderX, 22, DEFENSE_Z + 15);
+      jet.castShadow = true;
       scene.add(jet);
 
       gsap.to(jet.position, {
@@ -973,10 +1094,9 @@
           const boomX = (Math.random() - 0.5) * (BRIDGE_WIDTH - 2);
 
           playSfx('explosion');
-          shakeIntensity = 0.85;
+          shakeIntensity = 0.9;
           spawnExplosionSmoke(boomX, 0.5, boomZ, 35);
 
-          // ゾンビの一網打尽
           for (let i = zombies.length - 1; i >= 0; i--) {
             const z = zombies[i];
             if (Math.abs(z.mesh.position.z - boomZ) < 6.5) {
@@ -987,7 +1107,7 @@
                 scene.remove(z.mesh);
                 zombies.splice(i, 1);
                 score++;
-                document.getElementById('score-text').innerText = score;
+                document.getElementById('score-val').innerText = score;
               }
             }
           }
@@ -1016,7 +1136,7 @@
       else btn.classList.remove('ready');
     }
 
-    // --- 補給選択画面 ---
+    // --- 補給選択 ---
     function showUpgradeSelection() {
       isPlaying = false;
       const screen = document.getElementById('upgrade-screen');
@@ -1050,8 +1170,9 @@
       if (id === 'gunship' && !hasGunshipSupport) {
         hasGunshipSupport = true;
         const hg = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.7, 2.2), new THREE.MeshLambertMaterial({ color: 0x334155 }));
-        const rotor = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.06, 0.2), new THREE.MeshBasicMaterial({ color: 0x0f172a }));
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.7, 2.2), new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.6 }));
+        body.castShadow = true;
+        const rotor = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.06, 0.2), new THREE.MeshBasicMaterial({ color: 0x0f172a }));
         rotor.position.y = 0.45;
         hg.add(body, rotor);
         hg.rotor = rotor;
@@ -1068,7 +1189,6 @@
       document.getElementById('result-screen').style.display = 'none';
       document.getElementById('upgrade-screen').style.display = 'none';
 
-      // 消去
       squadMembers.forEach(m => scene.remove(m.mesh));
       bullets.forEach(b => scene.remove(b.mesh));
       zombies.forEach(z => scene.remove(z.mesh));
@@ -1104,11 +1224,18 @@
       const leader = createSoldierModel(true);
       leader.group.position.set(0, 0, DEFENSE_Z);
       scene.add(leader.group);
-      squadMembers.push({ mesh: leader.group, legL: leader.legL, legR: leader.legR, offsetX: 0, offsetZ: 0 });
+      squadMembers.push({
+        mesh: leader.group,
+        legL: leader.legL,
+        legR: leader.legR,
+        flashMat: leader.flashMat,
+        offsetX: 0,
+        offsetZ: 0
+      });
 
       updateSquadLayout();
       updateUltUi();
-      document.getElementById('score-text').innerText = '0';
+      document.getElementById('score-val').innerText = '0';
       document.getElementById('boss-hud').style.display = 'none';
 
       isPlaying = true;
@@ -1118,7 +1245,7 @@
     function spawnCasing(x, y, z) {
       const casing = new THREE.Mesh(
         new THREE.CylinderGeometry(0.04, 0.04, 0.12, 6),
-        new THREE.MeshLambertMaterial({ color: 0xfacc15 })
+        new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.9, roughness: 0.2 })
       );
       casing.rotation.z = Math.PI / 2;
       casing.position.set(x, y, z);
@@ -1129,25 +1256,26 @@
         vx: 0.08 + Math.random() * 0.05,
         vy: 0.12 + Math.random() * 0.08,
         vz: (Math.random() - 0.5) * 0.05,
-        life: 0.4
+        life: 0.45
       });
     }
 
-    // 肉片・血液パーティクル
+    // 肉片
     function spawnMeatDebris(x, y, z, color, count = 12) {
       for (let i = 0; i < count; i++) {
         const p = new THREE.Mesh(
-          new THREE.BoxGeometry(0.14, 0.14, 0.14),
-          new THREE.MeshLambertMaterial({ color })
+          new THREE.BoxGeometry(0.16, 0.16, 0.16),
+          new THREE.MeshStandardMaterial({ color, roughness: 0.6 })
         );
         p.position.set(x, y, z);
+        p.castShadow = true;
         scene.add(p);
         particles.push({
           mesh: p,
-          vx: (Math.random() - 0.5) * 0.35,
-          vy: Math.random() * 0.3 + 0.1,
-          vz: (Math.random() - 0.5) * 0.35,
-          life: 0.5
+          vx: (Math.random() - 0.5) * 0.38,
+          vy: Math.random() * 0.35 + 0.12,
+          vz: (Math.random() - 0.5) * 0.38,
+          life: 0.55
         });
       }
     }
@@ -1157,17 +1285,17 @@
       for (let i = 0; i < count; i++) {
         const isFire = Math.random() < 0.4;
         const p = new THREE.Mesh(
-          new THREE.SphereGeometry(0.3 + Math.random() * 0.25, 6, 6),
-          new THREE.MeshLambertMaterial({ color: isFire ? 0xf97316 : 0x1f2937 })
+          new THREE.SphereGeometry(0.35 + Math.random() * 0.3, 6, 6),
+          new THREE.MeshStandardMaterial({ color: isFire ? 0xf97316 : 0x1f2937, roughness: 0.9 })
         );
         p.position.set(x, y, z);
         scene.add(p);
         particles.push({
           mesh: p,
-          vx: (Math.random() - 0.5) * 0.4,
-          vy: Math.random() * 0.45 + 0.15,
-          vz: (Math.random() - 0.5) * 0.4,
-          life: 0.7
+          vx: (Math.random() - 0.5) * 0.45,
+          vy: Math.random() * 0.5 + 0.18,
+          vz: (Math.random() - 0.5) * 0.45,
+          life: 0.75
         });
       }
     }
@@ -1175,7 +1303,7 @@
     function updateBossHp() {
       if (!boss) return;
       const pct = Math.max(0, (boss.hp / boss.maxHp) * 100);
-      document.getElementById('boss-hp-fill').style.width = `${pct}%`;
+      document.getElementById('boss-bar-fill').style.width = `${pct}%`;
     }
 
     // --- メインループ ---
@@ -1196,11 +1324,11 @@
           bgmTimer = 0.13;
         }
 
-        // 道路と海面のスクロール
+        // 道路・海面スクロール
         if (roadMatRef) roadMatRef.offset.y -= 0.012;
         if (waterMatRef) waterMatRef.offset.y -= 0.006;
 
-        // カメラシェイク
+        // シェイク
         if (shakeIntensity > 0) {
           camera.position.x = (Math.random() - 0.5) * shakeIntensity;
           camera.position.y = 16 + (Math.random() - 0.5) * shakeIntensity;
@@ -1222,7 +1350,7 @@
           );
         }
 
-        // 部隊歩行アニメ
+        // 歩行アニメ
         const walkCycle = Math.sin(gameTime * 24);
         squadMembers.forEach(m => {
           m.mesh.position.x += (playerLeaderX + m.offsetX - m.mesh.position.x) * 0.25;
@@ -1231,6 +1359,9 @@
           m.legL.rotation.x = walkCycle * 0.6;
           m.legR.rotation.x = -walkCycle * 0.6;
           m.mesh.position.y = Math.abs(walkCycle) * 0.08;
+
+          // マズルフラッシュ減衰
+          if (m.flashMat.opacity > 0) m.flashMat.opacity -= 0.2;
         });
 
         // 小隊の一斉射撃
@@ -1241,17 +1372,23 @@
           playSfx('rifle');
 
           squadMembers.forEach(m => {
-            // オレンジ色に光る曳光弾
-            const b = new THREE.Mesh(new THREE.SphereGeometry(0.16, 5, 5), new THREE.MeshBasicMaterial({ color: 0xf59e0b }));
+            // オレンジ曳光弾
+            const b = new THREE.Mesh(
+              new THREE.SphereGeometry(0.16, 5, 5),
+              new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+            );
             b.position.set(m.mesh.position.x + 0.28, 0.6, m.mesh.position.z - 0.4);
             scene.add(b);
 
             bullets.push({
               mesh: b,
-              vz: -0.75,
+              vz: -0.78,
               vx: (Math.random() - 0.5) * 0.02,
               penetration: hasArmorPiercing ? 3 : 1
             });
+
+            // マズルフラッシュ点滅
+            m.flashMat.opacity = 1.0;
 
             // 薬莢排出
             spawnCasing(m.mesh.position.x + 0.35, 0.65, m.mesh.position.z - 0.2);
@@ -1262,7 +1399,7 @@
             const hb = new THREE.Mesh(new THREE.SphereGeometry(0.2, 5, 5), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
             hb.position.copy(gunshipMesh.position);
             scene.add(hb);
-            bullets.push({ mesh: hb, vz: -0.85, vx: 0, penetration: 3, isCrit: true });
+            bullets.push({ mesh: hb, vz: -0.88, vx: 0, penetration: 3, isCrit: true });
           }
         }
 
@@ -1273,16 +1410,14 @@
           gateTimer = 8.5;
         }
 
-        // --- ゾンビ大群のスポーン（Horde Spawning） ---
+        // ゾンビ大群スポーン（Horde Spawning）
         spawnTimer -= delta;
         if (spawnTimer <= 0 && !boss) {
-          // 一度に複数体のゾンビの群れ（ウェーブ）を同時出現！
-          const hordeCount = Math.floor(Math.random() * 3) + 3; // 1回につき3〜5体同時
+          const hordeCount = Math.floor(Math.random() * 3) + 3;
 
           for (let k = 0; k < hordeCount; k++) {
             const types = ['normal', 'normal', 'normal', 'runner', 'tank'];
             const type = types[Math.floor(Math.random() * types.length)];
-            const laneW = (BRIDGE_WIDTH - 2) / 4;
             const x = (Math.random() - 0.5) * (BRIDGE_WIDTH - 1.5);
             const zOffset = -65 - Math.random() * 8;
 
@@ -1292,13 +1427,15 @@
 
             let hp = 3;
             let spd = 0.09 + Math.random() * 0.02;
-            if (type === 'runner') { hp = 2; spd = 0.18 + Math.random() * 0.03; } // 猛ダッシュ！
-            if (type === 'tank') { hp = 15; spd = 0.045; } // 巨大タンク
+            if (type === 'runner') { hp = 2; spd = 0.18 + Math.random() * 0.03; }
+            if (type === 'tank') { hp = 15; spd = 0.045; }
 
             zombies.push({
               mesh: zObj.group,
               legL: zObj.legL,
               legR: zObj.legR,
+              skinMat: zObj.skinMat,
+              clothMat: zObj.clothMat,
               hp,
               type,
               speed: spd,
@@ -1306,7 +1443,6 @@
             });
           }
 
-          // 時間経過とともにスポーン加速
           spawnTimer = Math.max(0.35, 1.1 - gameTime * 0.015);
         }
 
@@ -1316,21 +1452,22 @@
           showUpgradeSelection();
         }
 
-        // 変異巨獣ボスの出現（42秒経過または撃破数到達）
+        // ボス出現
         if (!boss && (gameTime > 42 || score >= 200)) {
-          const bossMesh = createGoliathBoss();
-          bossMesh.position.set(0, 0, -75);
-          scene.add(bossMesh);
+          const bObj = createGoliathBoss();
+          bObj.group.position.set(0, 0, -75);
+          scene.add(bObj.group);
 
           boss = {
-            mesh: bossMesh,
+            mesh: bObj.group,
+            skinMat: bObj.skinMat,
             hp: 300,
             maxHp: 300,
             speed: 0.024
           };
           document.getElementById('boss-hud').style.display = 'flex';
           shakeIntensity = 0.8;
-          playSfx('groan');
+          playSfx('splat');
         }
 
         // --- 1. 弾丸の判定 ---
@@ -1389,15 +1526,23 @@
                 showDamageNumber(dmg, b.mesh.position.x, 1.2, b.mesh.position.z, isCrit);
                 spawnMeatDebris(b.mesh.position.x, 0.7, b.mesh.position.z, 0x5a7d65, 3);
 
-                // ノックバック（弾が当たると少し後退）
-                z.mesh.position.z -= 0.15;
+                // ヒットストロボ（白く光るフラッシュ演出！）
+                z.skinMat.emissive.setHex(0xffffff);
+                z.clothMat.emissive.setHex(0xffffff);
+                setTimeout(() => {
+                  z.skinMat.emissive.setHex(0x000000);
+                  z.clothMat.emissive.setHex(0x000000);
+                }, 60);
+
+                // ノックバック
+                z.mesh.position.z -= 0.18;
 
                 if (z.hp <= 0) {
                   spawnMeatDebris(z.mesh.position.x, 0.7, z.mesh.position.z, 0xef4444, z.type === 'tank' ? 30 : 12);
                   scene.remove(z.mesh);
                   zombies.splice(j, 1);
                   score++;
-                  document.getElementById('score-text').innerText = score;
+                  document.getElementById('score-val').innerText = score;
                 }
                 break;
               }
@@ -1419,6 +1564,10 @@
               showDamageNumber(dmg, bx, 2.5, bz, isCrit);
               updateBossHp();
 
+              // ボスヒットストロボ
+              boss.skinMat.emissive.setHex(0xffffff);
+              setTimeout(() => { boss.skinMat.emissive.setHex(0x000000); }, 60);
+
               if (boss.hp <= 0) {
                 spawnMeatDebris(bx, 3.0, bz, 0xef4444, 80);
                 shakeIntensity = 1.4;
@@ -1426,7 +1575,7 @@
                 scene.remove(boss.mesh);
                 boss = null;
                 score += 100;
-                document.getElementById('score-text').innerText = score;
+                document.getElementById('score-val').innerText = score;
                 endGame(true);
                 return;
               }
@@ -1439,18 +1588,17 @@
           }
         }
 
-        // --- 2. ゾンビの移動＆アニメーション ---
+        // --- 2. ゾンビの移動＆アニメ ---
         for (let i = zombies.length - 1; i >= 0; i--) {
           const z = zombies[i];
           z.mesh.position.z += z.speed;
 
-          // ゾンビ特有の千鳥足ウォーク
           const zWalk = Math.sin(gameTime * 15 + z.wobbleSeed);
           z.legL.rotation.x = zWalk * 0.7;
           z.legR.rotation.x = -zWalk * 0.7;
           z.mesh.rotation.z = Math.sin(gameTime * 8 + z.wobbleSeed) * 0.08;
 
-          // 防衛ライン突入（噛みつき攻撃！）
+          // 防衛ライン突入
           if (z.mesh.position.z >= DEFENSE_Z) {
             playSfx('splat');
             shakeIntensity = 0.5;
@@ -1458,7 +1606,6 @@
             scene.remove(z.mesh);
             zombies.splice(i, 1);
 
-            // 兵士を減らす（タンクは3人、他は1人）
             removeSquad(z.type === 'tank' ? 3 : 1);
             if (squadMembers.length <= 0) {
               endGame(false);
@@ -1467,11 +1614,10 @@
           }
         }
 
-        // ボスの移動
+        // ボス移動
         if (boss) {
           boss.mesh.position.z += boss.speed;
-          boss.mesh.position.y = Math.sin(gameTime * 8) * 0.2; // 巨大な足踏み
-
+          boss.mesh.position.y = Math.sin(gameTime * 8) * 0.2;
           if (boss.mesh.position.z >= DEFENSE_Z - 1.5) {
             endGame(false);
             return;
@@ -1539,7 +1685,7 @@
       const desc = document.getElementById('result-desc');
 
       if (isClear) {
-        title.innerText = 'OUTBREAK CONTAINED';
+        title.innerText = 'SECTOR SECURED';
         title.style.color = '#22c55e';
         desc.innerHTML = `変異巨獣ゴライアスを完全殲滅！<br>ゾンビのアウトブレイクを封じ込めた！<br><br>討伐数: <b>${score}体</b><br>残存戦力: <b>${squadMembers.length}名</b>`;
       } else {
