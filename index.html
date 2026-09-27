@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>ゲート増殖3D防衛シューター</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #030712;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    /* 9:16 アスペクト比コンテナ (画面中央配置) */
+    #game-wrapper {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100vw;
+      height: 100vh;
+      max-width: calc(100vh * 9 / 16);
+      max-height: calc(100vw * 16 / 9);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      background-color: #020617;
+      overflow: hidden;
+      touch-action: none;
+    }
+    canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+      touch-action: none;
+    }
+    /* ネオンパルスアニメーション */
+    @keyframes neonPulse {
+      0%, 100% { opacity: 0.9; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.05); }
+    }
+    .neon-pulse {
+      animation: neonPulse 1.8s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="flex items-center justify-center min-h-screen bg-slate-950">
+
+  <div id="game-wrapper" class="relative rounded-none sm:rounded-2xl border border-slate-800">
+    <!-- 3Dレンダリング用キャンバス -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- 画面上部 HUD (スコア、武器レベル、進行度) -->
+    <div class="absolute top-0 left-0 right-0 p-4 pointer-events-none flex flex-col gap-2 z-10">
+      <div class="flex justify-between items-center bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-xl border border-slate-700/60 shadow-lg text-white">
+        <div class="flex items-center space-x-2">
+          <span class="text-xs font-semibold text-slate-400">SCORE</span>
+          <span id="score-display" class="font-extrabold text-lg text-amber-400">0</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="text-xs font-semibold text-slate-400">WEAPON</span>
+          <span id="weapon-display" class="font-bold text-sm px-2 py-0.5 rounded-md bg-cyan-600 text-white shadow-sm">Lv.1 単発</span>
+        </div>
+      </div>
+
+      <!-- ボス / ステージ進行度バー -->
+      <div class="w-full bg-slate-900/80 backdrop-blur-sm rounded-full h-3 border border-slate-700 overflow-hidden relative shadow-inner">
+        <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 via-indigo-500 to-rose-500 h-full w-0 transition-all duration-300"></div>
+        <div id="boss-marker" class="absolute right-2 top-0 bottom-0 flex items-center text-[9px] font-black text-rose-300 tracking-wider">
+          BOSS⚠️
+        </div>
+      </div>
+    </div>
+
+    <!-- スタート画面オーバーレイ -->
+    <div id="start-modal" class="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center z-30">
+      <div class="max-w-xs space-y-4">
+        <div class="inline-block p-3 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 text-4xl mb-1">
+          🛡️⚡
+        </div>
+        <h1 class="text-2xl font-black text-white tracking-wider">GATE DEFENSE 3D</h1>
+        <p class="text-slate-300 text-xs leading-relaxed">
+          迫り来る敵兵を撃ち落とせ！<br>
+          <span class="text-cyan-400 font-bold">青いゲート (+ / ×)</span> に弾を通すと<strong class="text-white">弾が増殖</strong>！<br>
+          <span class="text-rose-400 font-bold">赤いゲート (- / ÷)</span> は弾を吸収！<br>
+          木箱アイテムを取ると武器が進化！
+        </p>
+        <div class="p-3 bg-slate-900/90 rounded-xl border border-slate-700 text-xs text-amber-300 font-medium">
+          👆 画面を指で左右になぞって移動
+        </div>
+        <button id="btn-start" class="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 active:from-cyan-600 active:to-blue-700 text-white font-extrabold rounded-xl shadow-lg shadow-cyan-500/30 tracking-wider text-base transform active:scale-95 transition-all">
+          防衛スタート！
+        </button>
+      </div>
+    </div>
+
+    <!-- リザルト画面オーバーレイ (ゲームオーバー / クリア) -->
+    <div id="result-modal" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-30">
+      <div class="max-w-xs w-full bg-slate-900/95 p-6 rounded-2xl border border-slate-700 shadow-2xl space-y-4">
+        <div id="result-icon" class="text-5xl">🏆</div>
+        <h2 id="result-title" class="text-2xl font-black text-white">STAGE CLEAR!</h2>
+        <p id="result-desc" class="text-slate-300 text-sm">巨大ボスを粉砕し防衛に成功した！</p>
+        
+        <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-1">
+          <div class="text-xs text-slate-400">FINAL SCORE</div>
+          <div id="result-score" class="text-3xl font-black text-amber-400">0</div>
+        </div>
+
+        <button id="btn-restart" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 active:from-emerald-600 active:to-teal-700 text-white font-extrabold rounded-xl shadow-lg shadow-emerald-500/30 tracking-wider text-base transform active:scale-95 transition-all">
+          もう一度遊ぶ
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 外部音源ファイルを使わず、内蔵Web Audio APIで効果音を自律生成
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      // 通常ショット音
+      playShoot(level) {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        if (level === 4) {
+          // プラズマ重低音
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(320, now);
+          osc.frequency.exponentialRampToValueAtTime(70, now + 0.18);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.18);
+          osc.start(now);
+          osc.stop(now + 0.18);
+        } else {
+          // レーザーショット
+          osc.type = 'sine';
+          const startFreq = 850 + level * 120;
+          osc.frequency.setValueAtTime(startFreq, now);
+          osc.frequency.exponentialRampToValueAtTime(180, now + 0.08);
+          gain.gain.setValueAtTime(0.09, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        }
+      }
+      // ゲート通過・増殖チャイム
+      playGatePass() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, now); // C5
+        osc.frequency.setValueAtTime(783.99, now + 0.05); // G5
+        osc.frequency.setValueAtTime(1046.50, now + 0.1); // C6
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.22);
+      }
+      // 敵ヒット破砕音
+      playHit() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.06);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.06);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.06);
+      }
+      // 爆発音 (ノイズ風)
+      playExplosion() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(110, now);
+        osc.frequency.exponentialRampToValueAtTime(25, now + 0.25);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      }
+      // パワーアップ音
+      playUpgrade() {
+        if (!this.ctx) return;
+        const notes = [440, 554.37, 659.25, 880];
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const now = this.ctx.currentTime + idx * 0.06;
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.12);
+        });
+      }
+    }
+    const audio = new SoundEngine();
+
+    const container = document.getElementById('game-wrapper');
+    const canvas = document.getElementById('game-canvas');
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a1128);
+    scene.fog = new THREE.FogExp2(0x0a1128, 0.012);
+
+    const camera = new THREE.PerspectiveCamera(54, container.clientWidth / container.clientHeight, 0.1, 300);
+    // 防衛ライン見下ろしクォータービュー
+    camera.position.set(0, 16.5, 23);
+    camera.lookAt(0, 0, 1);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const hemiLight = new THREE.HemisphereLight(0x7dd3fc, 0x1e293b, 0.85);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.2);
+    dirLight.position.set(15, 30, 20);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 1024;
+    dirLight.shadow.mapSize.height = 1024;
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 150;
+    dirLight.shadow.camera.left = -15;
+    dirLight.shadow.camera.right = 15;
+    dirLight.shadow.camera.top = 20;
+    dirLight.shadow.camera.bottom = -100;
+    scene.add(dirLight);
+
+    const BRIDGE_WIDTH = 12.5;
+    const BRIDGE_LENGTH = 240;
+    const DEFENSE_Z = 12.0;
+
+    // 橋本体
+    const bridgeGeo = new THREE.BoxGeometry(BRIDGE_WIDTH, 1.5, BRIDGE_LENGTH);
+    const bridgeMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      roughness: 0.8,
+      metalness: 0.1
+    });
+    const bridge = new THREE.Mesh(bridgeGeo, bridgeMat);
+    bridge.position.set(0, -0.75, -BRIDGE_LENGTH / 2 + 20);
+    bridge.receiveShadow = true;
+    scene.add(bridge);
+
+    // 橋のセンターラインとサイドレール
+    const railGeo = new THREE.BoxGeometry(0.4, 0.6, BRIDGE_LENGTH);
+    const railMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.4 });
+    const leftRail = new THREE.Mesh(railGeo, railMat);
+    leftRail.position.set(-BRIDGE_WIDTH / 2 + 0.2, 0.2, bridge.position.z);
+    const rightRail = new THREE.Mesh(railGeo, railMat);
+    rightRail.position.set(BRIDGE_WIDTH / 2 - 0.2, 0.2, bridge.position.z);
+    scene.add(leftRail);
+    scene.add(rightRail);
+
+    // 防衛境界ライン (赤く発光するレーザーボーダー)
+    const defLineGeo = new THREE.BoxGeometry(BRIDGE_WIDTH, 0.1, 0.4);
+    const defLineMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+    const defLine = new THREE.Mesh(defLineGeo, defLineMat);
+    defLine.position.set(0, 0.05, DEFENSE_Z);
+    scene.add(defLine);
+
+    // 背景に漂うサイバーピラー装飾
+    const pillarGroup = new THREE.Group();
+    for (let z = 10; z > -BRIDGE_LENGTH; z -= 30) {
+      const pGeo = new THREE.BoxGeometry(2, 40, 2);
+      const pMat = new THREE.MeshStandardMaterial({ color: 0x0f172a });
+      const pL = new THREE.Mesh(pGeo, pMat);
+      pL.position.set(-BRIDGE_WIDTH / 2 - 3, -15, z);
+      const pR = new THREE.Mesh(pGeo, pMat);
+      pR.position.set(BRIDGE_WIDTH / 2 + 3, -15, z);
+      pillarGroup.add(pL);
+      pillarGroup.add(pR);
+    }
+    scene.add(pillarGroup);
+
+    function createToySoldier(isHero = false, scale = 1) {
+      const group = new THREE.Group();
+      const bodyColor = isHero ? 0x0284c7 : 0xe11d48;
+      const headColor = isHero ? 0xfde047 : 0x1e293b;
+      const accentColor = isHero ? 0x38bdf8 : 0x991b1b;
+
+      // 胴体 (Box)
+      const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.4 });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.8 * scale, 0.9 * scale, 0.5 * scale), bodyMat);
+      body.position.y = 0.95 * scale;
+      body.castShadow = true;
+      group.add(body);
+
+      // 頭部 (Box + ヘルメット)
+      const headMat = new THREE.MeshStandardMaterial({ color: headColor, roughness: 0.3 });
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.55 * scale, 0.55 * scale, 0.55 * scale), headMat);
+      head.position.y = 1.7 * scale;
+      head.castShadow = true;
+      group.add(head);
+
+      const capMat = new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.5 });
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.35 * scale, 0.42 * scale, 0.25 * scale, 8), capMat);
+      cap.position.y = 2.05 * scale;
+      group.add(cap);
+
+      // バイザー/目
+      const eyeMat = new THREE.MeshBasicMaterial({ color: isHero ? 0x0369a1 : 0xffffff });
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.4 * scale, 0.15 * scale, 0.1 * scale), eyeMat);
+      eye.position.set(0, 1.7 * scale, (isHero ? -0.28 : 0.28) * scale);
+      group.add(eye);
+
+      // 手腕・銃
+      const armMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.5 });
+      const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.22 * scale, 0.65 * scale, 0.22 * scale), armMat);
+      leftArm.position.set(-0.55 * scale, 0.9 * scale, 0);
+      const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.22 * scale, 0.65 * scale, 0.22 * scale), armMat);
+      rightArm.position.set(0.55 * scale, 0.9 * scale, 0);
+      group.add(leftArm);
+      group.add(rightArm);
+
+      // 武器 (自機のみ)
+      if (isHero) {
+        const gunMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
+        const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * scale, 0.12 * scale, 0.8 * scale, 8), gunMat);
+        gun.rotation.x = Math.PI / 2;
+        gun.position.set(0.4 * scale, 0.85 * scale, -0.4 * scale);
+        group.add(gun);
+      }
+
+      // 脚 (左右)
+      const legMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.6 });
+      const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.3 * scale, 0.55 * scale, 0.35 * scale), legMat);
+      leftLeg.position.set(-0.25 * scale, 0.28 * scale, 0);
+      const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.3 * scale, 0.55 * scale, 0.35 * scale), legMat);
+      rightLeg.position.set(0.25 * scale, 0.28 * scale, 0);
+      leftLeg.castShadow = true;
+      rightLeg.castShadow = true;
+      group.add(leftLeg);
+      group.add(rightLeg);
+
+      group.userData = { leftLeg, rightLeg, animTime: Math.random() * 10 };
+      return group;
+    }
+
+    const player = createToySoldier(true, 1.05);
+    player.position.set(0, 0, DEFENSE_Z);
+    scene.add(player);
+
+    function createGateCanvasTexture(label, isPositive) {
+      const gCanvas = document.createElement('canvas');
+      gCanvas.width = 256;
+      gCanvas.height = 256;
+      const ctx = gCanvas.getContext('2d');
+
+      // 背景 (半透明グローグラデーション)
+      const grad = ctx.createLinearGradient(0, 0, 0, 256);
+      if (isPositive) {
+        grad.addColorStop(0, 'rgba(6, 182, 212, 0.85)');
+        grad.addColorStop(1, 'rgba(3, 105, 161, 0.85)');
+      } else {
+        grad.addColorStop(0, 'rgba(239, 68, 68, 0.85)');
+        grad.addColorStop(1, 'rgba(159, 18, 57, 0.85)');
+      }
+
+      ctx.fillStyle = grad;
+      // 角丸四角形
+      const r = 24;
+      ctx.beginPath();
+      ctx.moveTo(r, 0);
+      ctx.lineTo(256 - r, 0);
+      ctx.quadraticCurveTo(256, 0, 256, r);
+      ctx.lineTo(256, 256 - r);
+      ctx.quadraticCurveTo(256, 256, 256 - r, 256);
+      ctx.lineTo(r, 256);
+      ctx.quadraticCurveTo(0, 256, 0, 256 - r);
+      ctx.lineTo(0, r);
+      ctx.quadraticCurveTo(0, 0, r, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      // 内側枠線
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+
+      // 中央テキスト
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 80px "Arial Black", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,0.6)';
+      ctx.shadowBlur = 12;
+      ctx.fillText(label, 128, 128);
+
+      const texture = new THREE.CanvasTexture(gCanvas);
+      return texture;
+    }
+
+    let gameState = 'START'; // 'START' | 'PLAYING' | 'GAMEOVER' | 'CLEAR'
+    let score = 0;
+    let weaponLevel = 1;
+    let shootTimer = 0;
+    let stageDistance = 0;
+    const MAX_STAGE_DISTANCE = 160;
+
+    const WEAPON_INFO = {
+      1: { name: 'Lv.1 単発', interval: 0.22, speed: 45, damage: 10, color: 0xfacc15 },
+      2: { name: 'Lv.2 3-Way', interval: 0.20, speed: 45, damage: 12, color: 0x38bdf8 },
+      3: { name: 'Lv.3 ガトリング', interval: 0.08, speed: 52, damage: 9, color: 0xf97316 },
+      4: { name: 'Lv.4 プラズマ弾', interval: 0.32, speed: 38, damage: 45, color: 0xc084fc }
+    };
+
+    // エンティティ管理配列
+    let bullets = [];
+    let enemies = [];
+    let gates = [];
+    let items = [];
+    let particles = [];
+    let boss = null;
+
+    function createGate(x, z, width, label, opType, value) {
+      const isPositive = (opType === '+' || opType === '×');
+      const texture = createGateCanvasTexture(label, isPositive);
+      
+      const geo = new THREE.PlaneGeometry(width, 3.2);
+      const mat = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 0.9,
+        side: THREE.DoubleSide
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(x, 1.7, z);
+
+      // フレーム柱
+      const poleGeo = new THREE.CylinderGeometry(0.12, 0.12, 3.5);
+      const poleMat = new THREE.MeshStandardMaterial({ color: isPositive ? 0x06b6d4 : 0xef4444 });
+      const p1 = new THREE.Mesh(poleGeo, poleMat);
+      p1.position.set(-width / 2, 0, 0);
+      const p2 = new THREE.Mesh(poleGeo, poleMat);
+      p2.position.set(width / 2, 0, 0);
+      mesh.add(p1);
+      mesh.add(p2);
+
+      scene.add(mesh);
+
+      return {
+        id: Math.random().toString(36).substr(2, 9),
+        mesh,
+        x,
+        z,
+        width,
+        opType,
+        value,
+        isPositive,
+        pulse: 0
+      };
+    }
+
+    function createWeaponBox(x, z) {
+      const group = new THREE.Group();
+      // キューブ
+      const boxGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+      const boxMat = new THREE.MeshStandardMaterial({
+        color: 0xf59e0b,
+        emissive: 0xd97706,
+        emissiveIntensity: 0.6,
+        roughness: 0.3
+      });
+      const box = new THREE.Mesh(boxGeo, boxMat);
+      box.castShadow = true;
+      group.add(box);
+
+      // 周囲のオーラリング
+      const ringGeo = new THREE.TorusGeometry(1.1, 0.08, 8, 24);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0xfde047 });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = Math.PI / 2;
+      group.add(ring);
+
+      group.position.set(x, 1.3, z);
+      scene.add(group);
+
+      return {
+        mesh: group,
+        z,
+        active: true
+      };
+    }
+
+    function spawnEnemySoldier(x, z, hp = 15) {
+      const soldier = createToySoldier(false, 1.0);
+      soldier.position.set(x, 0, z);
+      scene.add(soldier);
+      enemies.push({
+        mesh: soldier,
+        hp: hp,
+        maxHp: hp,
+        speed: 3.2 + Math.random() * 0.8,
+        isBoss: false
+      });
+    }
+
+    function spawnBoss(z) {
+      const bossScale = 3.6;
+      const soldier = createToySoldier(false, bossScale);
+      soldier.position.set(0, 0, z);
+
+      // ボス頭上HPバー (3D Sprite)
+      const hpCanvas = document.createElement('canvas');
+      hpCanvas.width = 128;
+      hpCanvas.height = 16;
+      const hpCtx = hpCanvas.getContext('2d');
+      hpCtx.fillStyle = '#ef4444';
+      hpCtx.fillRect(0, 0, 128, 16);
+      const hpTexture = new THREE.CanvasTexture(hpCanvas);
+
+      const hpMat = new THREE.SpriteMaterial({ map: hpTexture });
+      const hpSprite = new THREE.Sprite(hpMat);
+      hpSprite.position.set(0, 8.5, 0);
+      hpSprite.scale.set(5.5, 0.7, 1);
+      soldier.add(hpSprite);
+
+      scene.add(soldier);
+
+      boss = {
+        mesh: soldier,
+        hp: 450,
+        maxHp: 450,
+        speed: 1.8,
+        isBoss: true,
+        hpTexture,
+        hpCtx
+      };
+      enemies.push(boss);
+    }
+
+    function createSparks(pos, colorHex, count = 12, speed = 6) {
+      for (let i = 0; i < count; i++) {
+        const geo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+        const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(pos);
+
+        const velocity = new THREE.Vector3(
+          (Math.random() - 0.5) * speed,
+          (Math.random() * 0.7 + 0.3) * speed,
+          (Math.random() - 0.5) * speed
+        );
+        particles.push({
+          mesh,
+          velocity,
+          life: 0.6 + Math.random() * 0.4,
+          maxLife: 1.0
+        });
+        scene.add(mesh);
+      }
+    }
+
+    let isDragging = false;
+    let prevPointerX = 0;
+    let targetPlayerX = 0;
+    const PLAYER_MAX_X = (BRIDGE_WIDTH / 2) - 1.2;
+
+    function handlePointerDown(e) {
+      if (gameState !== 'PLAYING') return;
+      isDragging = true;
+      prevPointerX = e.clientX || (e.touches && e.touches[0].clientX);
+      audio.init();
+    }
+
+    function handlePointerMove(e) {
+      if (!isDragging || gameState !== 'PLAYING') return;
+      const currentX = e.clientX || (e.touches && e.touches[0].clientX);
+      const deltaX = currentX - prevPointerX;
+      prevPointerX = currentX;
+
+      // 画面横幅に応じた繊細な移動感度
+      const sensitivity = 0.038;
+      targetPlayerX += deltaX * sensitivity;
+      targetPlayerX = Math.max(-PLAYER_MAX_X, Math.min(PLAYER_MAX_X, targetPlayerX));
+    }
+
+    function handlePointerUp() {
+      isDragging = false;
+    }
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+
+    window.addEventListener('touchstart', handlePointerDown, { passive: true });
+    window.addEventListener('touchmove', handlePointerMove, { passive: true });
+    window.addEventListener('touchend', handlePointerUp, { passive: true });
+
+    function fireBullets() {
+      const config = WEAPON_INFO[weaponLevel];
+      audio.playShoot(weaponLevel);
+
+      const spawnBullet = (offsetAngle = 0, offsetX = 0) => {
+        let geo, mat;
+        if (weaponLevel === 4) {
+          // 特大プラズマ弾
+          geo = new THREE.SphereGeometry(0.65, 12, 12);
+          mat = new THREE.MeshBasicMaterial({ color: config.color });
+        } else {
+          // レーザー弾
+          geo = new THREE.CylinderGeometry(0.12, 0.12, 0.7, 6);
+          mat = new THREE.MeshBasicMaterial({ color: config.color });
+        }
+        const mesh = new THREE.Mesh(geo, mat);
+        if (weaponLevel !== 4) mesh.rotation.x = Math.PI / 2;
+
+        const posX = player.position.x + offsetX;
+        const posZ = player.position.z - 1.2;
+        mesh.position.set(posX, 1.2, posZ);
+        scene.add(mesh);
+
+        const vx = Math.sin(offsetAngle) * config.speed;
+        const vz = -Math.cos(offsetAngle) * config.speed;
+
+        bullets.push({
+          mesh,
+          vx,
+          vz,
+          damage: config.damage,
+          color: config.color,
+          radius: weaponLevel === 4 ? 0.8 : 0.35,
+          passedGates: new Set()
+        });
+      };
+
+      if (weaponLevel === 1) {
+        spawnBullet(0, 0.4);
+      } else if (weaponLevel === 2) {
+        // 3-Way
+        spawnBullet(-0.16, 0.3);
+        spawnBullet(0, 0.4);
+        spawnBullet(0.16, 0.5);
+      } else if (weaponLevel === 3) {
+        // 高速ガトリング 2連砲
+        spawnBullet(0, (Math.random() > 0.5 ? 0.3 : -0.3));
+      } else if (weaponLevel === 4) {
+        spawnBullet(0, 0);
+      }
+    }
+
+    function initLevel() {
+      // 既存オブジェクトのクリーンアップ
+      bullets.forEach(b => scene.remove(b.mesh));
+      enemies.forEach(e => scene.remove(e.mesh));
+      gates.forEach(g => scene.remove(g.mesh));
+      items.forEach(i => scene.remove(i.mesh));
+      particles.forEach(p => scene.remove(p.mesh));
+
+      bullets = [];
+      enemies = [];
+      gates = [];
+      items = [];
+      particles = [];
+      boss = null;
+
+      // ゲート設置 (左 / 右の対比配置)
+      const gateConfigs = [
+        // Z = -20
+        { z: -20, left: { label: '+3', op: '+', val: 3 }, right: { label: '-2', op: '-', val: 2 } },
+        // Z = -50
+        { z: -50, left: { label: '×2', op: '×', val: 2 }, right: { label: '÷2', op: '÷', val: 2 } },
+        // Z = -85
+        { z: -85, left: { label: '+5', op: '+', val: 5 }, right: { label: '×2', op: '×', val: 2 } },
+        // Z = -120
+        { z: -120, left: { label: '×3', op: '×', val: 3 }, right: { label: '+8', op: '+', val: 8 } }
+      ];
+
+      gateConfigs.forEach(c => {
+        const halfWidth = 5.2;
+        gates.push(createGate(-2.9, c.z, halfWidth, c.left.label, c.left.op, c.left.val));
+        gates.push(createGate(2.9, c.z, halfWidth, c.right.label, c.right.op, c.right.val));
+      });
+
+      // 武器ボックス配置
+      items.push(createWeaponBox(0, -35));
+      items.push(createWeaponBox(-2.5, -70));
+      items.push(createWeaponBox(2.5, -105));
+
+      // 敵兵士の配置 (群れで行進)
+      const enemyWaves = [-15, -30, -42, -62, -78, -98, -112, -130];
+      enemyWaves.forEach(z => {
+        const count = 3 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < count; i++) {
+          const x = (i - (count - 1) / 2) * 2.3 + (Math.random() - 0.5) * 0.8;
+          spawnEnemySoldier(x, z, 15 + Math.abs(z) * 0.25);
+        }
+      });
+
+      // ボス兵士を最奥に配置
+      spawnBoss(-155);
+
+      // プレイヤーリセット
+      player.position.set(0, 0, DEFENSE_Z);
+      targetPlayerX = 0;
+      score = 0;
+      weaponLevel = 1;
+      stageDistance = 0;
+      updateUI();
+    }
+
+    const scoreDisplay = document.getElementById('score-display');
+    const weaponDisplay = document.getElementById('weapon-display');
+    const progressBar = document.getElementById('progress-bar');
+    const startModal = document.getElementById('start-modal');
+    const resultModal = document.getElementById('result-modal');
+    const resultTitle = document.getElementById('result-title');
+    const resultDesc = document.getElementById('result-desc');
+    const resultScore = document.getElementById('result-score');
+    const resultIcon = document.getElementById('result-icon');
+
+    function updateUI() {
+      scoreDisplay.textContent = score;
+      const info = WEAPON_INFO[weaponLevel];
+      weaponDisplay.textContent = info.name;
+
+      if (boss && boss.hp > 0) {
+        // ボスまでの距離に応じたプログレス
+        const currentDist = Math.max(0, DEFENSE_Z - boss.mesh.position.z);
+        const totalDist = DEFENSE_Z - (-155);
+        const pct = Math.min(100, Math.max(0, (1 - (currentDist / totalDist)) * 100));
+        progressBar.style.width = `${pct}%`;
+      }
+    }
+
+    function triggerGameOver(isWin) {
+      gameState = isWin ? 'CLEAR' : 'GAMEOVER';
+      resultModal.classList.remove('hidden');
+      resultScore.textContent = score;
+
+      if (isWin) {
+        audio.playUpgrade();
+        resultIcon.textContent = '🎉';
+        resultTitle.textContent = 'STAGE CLEAR!';
+        resultTitle.className = 'text-2xl font-black text-emerald-400';
+        resultDesc.textContent = '巨大ボスを完全撃破し防衛線を死守した！';
+      } else {
+        audio.playExplosion();
+        resultIcon.textContent = '💥';
+        resultTitle.textContent = 'GAME OVER';
+        resultTitle.className = 'text-2xl font-black text-rose-500';
+        resultDesc.textContent = '敵兵が最終防衛ラインに到達してしまった…';
+      }
+    }
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = Math.min(clock.getDelta(), 0.05);
+
+      if (gameState === 'PLAYING') {
+        // プレイヤーのスムーズな左右補間
+        player.position.x += (targetPlayerX - player.position.x) * 14 * delta;
+
+        // プレイヤー自動射撃
+        shootTimer += delta;
+        const currentWeapon = WEAPON_INFO[weaponLevel];
+        if (shootTimer >= currentWeapon.interval) {
+          shootTimer = 0;
+          fireBullets();
+        }
+
+        // 弾丸の更新とゲート衝突判定
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const b = bullets[i];
+          b.mesh.position.x += b.vx * delta;
+          b.mesh.position.z += b.vz * delta;
+
+          // ゲート通過チェック
+          gates.forEach(gate => {
+            if (!b.passedGates.has(gate.id)) {
+              const dz = Math.abs(b.mesh.position.z - gate.z);
+              const dx = Math.abs(b.mesh.position.x - gate.x);
+              if (dz < 0.8 && dx < (gate.width / 2)) {
+                b.passedGates.add(gate.id);
+                gate.pulse = 0.3; // ゲート発光パルス
+
+                if (gate.isPositive) {
+                  audio.playGatePass();
+                  createSparks(b.mesh.position, 0x38bdf8, 8, 4);
+
+                  // 弾の複製・拡散
+                  let spawnCount = 1;
+                  if (gate.opType === '+') spawnCount = gate.value;
+                  if (gate.opType === '×') spawnCount = 2;
+
+                  for (let s = 0; s < spawnCount; s++) {
+                    const extraGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.7, 6);
+                    const extraMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+                    const extraMesh = new THREE.Mesh(extraGeo, extraMat);
+                    extraMesh.rotation.x = Math.PI / 2;
+                    extraMesh.position.copy(b.mesh.position);
+                    extraMesh.position.x += (Math.random() - 0.5) * 0.8;
+                    scene.add(extraMesh);
+
+                    const spreadAngle = (Math.random() - 0.5) * 0.45;
+                    const speed = 45;
+                    const clonedPassed = new Set(b.passedGates);
+
+                    bullets.push({
+                      mesh: extraMesh,
+                      vx: Math.sin(spreadAngle) * speed,
+                      vz: -Math.cos(spreadAngle) * speed,
+                      damage: b.damage,
+                      color: 0x38bdf8,
+                      radius: b.radius,
+                      passedGates: clonedPassed
+                    });
+                  }
+                } else {
+                  // マイナスゲート: 弾の消滅
+                  createSparks(b.mesh.position, 0xef4444, 6, 3);
+                  scene.remove(b.mesh);
+                  bullets.splice(i, 1);
+                  return;
+                }
+              }
+            }
+          });
+
+          // 画面奥へ消えた弾の破棄
+          if (b && b.mesh.position.z < -190) {
+            scene.remove(b.mesh);
+            bullets.splice(i, 1);
+          }
+        }
+
+        // 武器ドロップアイテムの更新
+        items.forEach(item => {
+          if (!item.active) return;
+          item.mesh.rotation.y += 2.0 * delta;
+          item.mesh.position.y = 1.3 + Math.sin(clock.elapsedTime * 4) * 0.2;
+
+          // プレイヤーとの接触
+          if (Math.abs(player.position.z - item.z) < 1.4 && Math.abs(player.position.x - item.mesh.position.x) < 1.4) {
+            item.active = false;
+            scene.remove(item.mesh);
+            weaponLevel = Math.min(4, weaponLevel + 1);
+            audio.playUpgrade();
+            createSparks(item.mesh.position, 0xfde047, 24, 8);
+            updateUI();
+          }
+
+          // 弾丸との衝突
+          bullets.forEach(b => {
+            if (item.active && Math.abs(b.mesh.position.z - item.z) < 1.0 && Math.abs(b.mesh.position.x - item.mesh.position.x) < 1.0) {
+              item.active = false;
+              scene.remove(item.mesh);
+              weaponLevel = Math.min(4, weaponLevel + 1);
+              audio.playUpgrade();
+              createSparks(item.mesh.position, 0xfde047, 24, 8);
+              updateUI();
+            }
+          });
+        });
+
+        // 敵兵士・ボスの更新
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          const enemy = enemies[i];
+          enemy.mesh.position.z += enemy.speed * delta;
+
+          // 行進アニメーション (脚の前後スイング)
+          const anim = enemy.mesh.userData;
+          if (anim && anim.leftLeg) {
+            anim.animTime += delta * 9;
+            anim.leftLeg.rotation.x = Math.sin(anim.animTime) * 0.6;
+            anim.rightLeg.rotation.x = -Math.sin(anim.animTime) * 0.6;
+          }
+
+          // ボスのHPバー描画更新
+          if (enemy.isBoss && enemy.hpTexture) {
+            const pct = Math.max(0, enemy.hp / enemy.maxHp);
+            enemy.hpCtx.fillStyle = '#1e293b';
+            enemy.hpCtx.fillRect(0, 0, 128, 16);
+            enemy.hpCtx.fillStyle = '#ef4444';
+            enemy.hpCtx.fillRect(0, 0, 128 * pct, 16);
+            enemy.hpTexture.needsUpdate = true;
+          }
+
+          // 弾丸との当たり判定
+          const hitRadius = enemy.isBoss ? 2.6 : 0.8;
+          for (let j = bullets.length - 1; j >= 0; j--) {
+            const b = bullets[j];
+            const dist = b.mesh.position.distanceTo(enemy.mesh.position);
+            if (dist < (hitRadius + b.radius)) {
+              enemy.hp -= b.damage;
+              score += 15;
+              audio.playHit();
+              createSparks(b.mesh.position, 0xfacc15, 4, 4);
+
+              // 通常弾はヒットで消滅 (Lv4プラズマ弾は貫通)
+              if (weaponLevel !== 4) {
+                scene.remove(b.mesh);
+                bullets.splice(j, 1);
+              }
+
+              // 敵撃破
+              if (enemy.hp <= 0) {
+                audio.playExplosion();
+                createSparks(enemy.mesh.position, enemy.isBoss ? 0xf43f5e : 0xe11d48, enemy.isBoss ? 60 : 18, enemy.isBoss ? 12 : 7);
+                scene.remove(enemy.mesh);
+                enemies.splice(i, 1);
+
+                if (enemy.isBoss) {
+                  score += 2000;
+                  updateUI();
+                  triggerGameOver(true);
+                } else {
+                  score += 100;
+                  updateUI();
+                }
+                break;
+              }
+            }
+          }
+
+          // 防衛ライン突破チェック (敗北)
+          if (enemy && enemy.mesh.position.z >= DEFENSE_Z - 0.4) {
+            triggerGameOver(false);
+            break;
+          }
+        }
+
+        // ゲートのパルス減衰アニメーション
+        gates.forEach(g => {
+          if (g.pulse > 0) {
+            g.pulse -= delta;
+            const scale = 1.0 + Math.max(0, g.pulse * 0.4);
+            g.mesh.scale.set(scale, scale, 1);
+          }
+        });
+
+        // パーティクルの更新
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.life -= delta;
+          p.mesh.position.addScaledVector(p.velocity, delta);
+          p.velocity.y -= 12 * delta; // 重力
+          p.mesh.scale.multiplyScalar(0.95);
+
+          if (p.life <= 0) {
+            scene.remove(p.mesh);
+            particles.splice(i, 1);
+          }
+        }
+
+        updateUI();
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    function onResize() {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+    window.addEventListener('resize', onResize);
+
+    const btnStart = document.getElementById('btn-start');
+    const btnRestart = document.getElementById('btn-restart');
+
+    btnStart.addEventListener('click', () => {
+      audio.init();
+      startModal.classList.add('hidden');
+      initLevel();
+      gameState = 'PLAYING';
+    });
+
+    btnRestart.addEventListener('click', () => {
+      audio.init();
+      resultModal.classList.add('hidden');
+      initLevel();
+      gameState = 'PLAYING';
+    });
+
+    // ページロード完了後にレンダリング開始
+    window.onload = function() {
+      onResize();
+      initLevel();
+      animate();
+    };
+  </script>
+</body>
+</html>
