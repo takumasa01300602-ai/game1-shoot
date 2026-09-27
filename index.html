@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>DEAD BRIDGE: REMASTERED</title>
+  <title>Z-OUTBREAK: REVOLUTION</title>
   <style>
     * {
       box-sizing: border-box;
@@ -39,12 +39,12 @@
       position: absolute;
       inset: 0;
       pointer-events: none;
-      box-shadow: inset 0 0 60px rgba(15, 23, 42, 0.6), inset 0 0 130px rgba(0, 0, 0, 0.45);
+      box-shadow: inset 0 0 70px rgba(15, 23, 42, 0.65), inset 0 0 140px rgba(0, 0, 0, 0.45);
       z-index: 5;
       transition: box-shadow 0.2s;
     }
     #vignette.hit {
-      box-shadow: inset 0 0 80px rgba(220, 38, 38, 0.85), inset 0 0 160px rgba(185, 28, 28, 0.65);
+      box-shadow: inset 0 0 90px rgba(220, 38, 38, 0.85), inset 0 0 180px rgba(185, 28, 28, 0.7);
     }
 
     /* ネイティブAAA級 HUD */
@@ -122,7 +122,7 @@
       transition: width 0.08s linear;
     }
 
-    /* 空爆ボタン */
+    /* 空爆支援ボタン */
     #ult-btn {
       position: absolute;
       bottom: calc(env(safe-area-inset-bottom, 16px) + 20px);
@@ -186,8 +186,8 @@
     .screen-overlay {
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.88) 0%, rgba(2, 6, 23, 0.96) 100%);
-      backdrop-filter: blur(14px);
+      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.9) 0%, rgba(2, 6, 23, 0.98) 100%);
+      backdrop-filter: blur(16px);
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -226,39 +226,26 @@
     }
     .btn-main:active { transform: scale(0.95); }
 
-    /* アップグレード画面 */
-    #upgrade-screen {
-      position: absolute;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.92);
-      backdrop-filter: blur(14px);
-      display: none;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 45;
-      padding: 20px;
+    /* ローディングバー */
+    #loading-box {
+      width: 240px;
+      margin-top: 15px;
     }
-    #upgrade-cards {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
+    .progress-bar-bg {
       width: 100%;
-      max-width: 320px;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 5px;
+      overflow: hidden;
+      margin-top: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
     }
-    .up-card {
-      background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95));
-      border: 2px solid #64748b;
-      border-radius: 14px;
-      padding: 14px 18px;
-      text-align: left;
-      cursor: pointer;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.45);
-      transition: transform 0.15s, border-color 0.15s;
+    #loading-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #38bdf8, #22c55e);
+      transition: width 0.2s;
     }
-    .up-card:active { transform: scale(0.96); border-color: #22c55e; }
-    .up-title { font-size: 16px; font-weight: 900; color: #facc15; margin-bottom: 4px; }
-    .up-desc { font-size: 12px; color: #cbd5e1; line-height: 1.4; }
 
     #error-box {
       position: absolute;
@@ -268,7 +255,10 @@
     }
   </style>
 
+  <!-- Three.js + GLTFLoader + SkeletonUtils + GSAP -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 </head>
 <body>
@@ -302,23 +292,23 @@
       <span id="ult-pct">0%</span>
     </button>
 
-    <!-- アップグレード画面 -->
-    <div id="upgrade-screen">
-      <h2 style="color: #facc15; font-size: 20px; font-weight: 900; margin-bottom: 6px; letter-spacing: 1px;">TACTICAL REINFORCEMENT</h2>
-      <p style="color: #cbd5e1; font-size: 12px; margin-bottom: 18px;">補給物資を選択してください</p>
-      <div id="upgrade-cards"></div>
-    </div>
-
-    <!-- スタート画面 -->
+    <!-- スタート画面 ＆ アセットローディング -->
     <div id="start-screen" class="screen-overlay">
-      <h1 class="screen-title">DEAD BRIDGE: REMASTERED</h1>
-      <p class="screen-desc">
-        <b>【ハイエンド・リアル3Dサバイバー】</b><br>
+      <h1 class="screen-title">Z-OUTBREAK: REVOLUTION</h1>
+      <p id="start-subtext" class="screen-desc">
+        <b>【リアル3Dモデル・次世代サバイバー】</b><br>
         晴天の巨大ベイブリッジを埋め尽くす<b>ゾンビの大群</b>を撃滅せよ！<br>
-        作戦ゲートを撃ち抜いて部隊を増殖させ、一斉掃射！<br>
-        空爆ゲージ満タンで<b>超音速ジェット爆撃</b>を投下せよ。
+        作戦ゲートを撃ち抜いて部隊を増殖させ、一斉掃射！
       </p>
-      <button id="start-btn" class="btn-main">COMMENCE ENGAGEMENT</button>
+
+      <div id="loading-box">
+        <div id="loading-text" style="color: #38bdf8; font-size: 11px; font-weight: 900; letter-spacing: 1px;">DOWNLOADING 3D ASSETS... (0%)</div>
+        <div class="progress-bar-bg">
+          <div id="loading-fill"></div>
+        </div>
+      </div>
+
+      <button id="start-btn" class="btn-main" style="display: none; margin-top: 15px;">COMMENCE ENGAGEMENT</button>
     </div>
 
     <!-- リザルト画面 -->
@@ -466,16 +456,10 @@
     let gameTime = 0;
     let spawnTimer = 0;
     let gateTimer = 0;
-    let waveCount = 1;
     let shakeIntensity = 0;
 
     let ultGauge = 0;
     let isUltReady = false;
-
-    let fireRateMult = 1.0;
-    let hasArmorPiercing = false;
-    let hasGunshipSupport = false;
-    let gunshipMesh = null;
 
     // Three.js
     let scene, camera, renderer;
@@ -492,69 +476,23 @@
     let shellCasings = [];
     let boss = null;
 
-    // 共通マテリアルキャッシュ
-    let matCache = {};
+    // --- 外部glTFアセット保持用 ---
+    let baseSoldierModel = null;
+    let soldierAnimations = [];
 
-    // --- 高精細プロシージャルテクスチャ生成 ---
-    // 迷彩布地テクスチャ
-    function createCamoTexture() {
-      const cvs = document.createElement('canvas');
-      cvs.width = 512; cvs.height = 512;
-      const ctx = cvs.getContext('2d');
-      ctx.fillStyle = '#78716c';
-      ctx.fillRect(0, 0, 512, 512);
-
-      const colors = ['#57534e', '#a8a29e', '#44403c', '#292524'];
-      for (let i = 0; i < 300; i++) {
-        ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
-        ctx.beginPath();
-        const rx = Math.random() * 512;
-        const ry = Math.random() * 512;
-        const rw = 20 + Math.random() * 40;
-        const rh = 15 + Math.random() * 30;
-        ctx.ellipse(rx, ry, rw, rh, Math.random() * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      const tex = new THREE.CanvasTexture(cvs);
-      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(2, 2);
-      return tex;
-    }
-
-    // ゾンビの腐敗皮膚テクスチャ
-    function createZombieSkinTexture() {
-      const cvs = document.createElement('canvas');
-      cvs.width = 512; cvs.height = 512;
-      const ctx = cvs.getContext('2d');
-      ctx.fillStyle = '#52796f';
-      ctx.fillRect(0, 0, 512, 512);
-
-      // 血管と腐敗シミ
-      for (let i = 0; i < 400; i++) {
-        ctx.fillStyle = Math.random() < 0.6 ? '#2f3e46' : '#7f1d1d';
-        ctx.beginPath();
-        ctx.arc(Math.random() * 512, Math.random() * 512, 4 + Math.random() * 12, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      const tex = new THREE.CanvasTexture(cvs);
-      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
-      return tex;
-    }
-
-    // アスファルト道路
+    // --- 高精細テクスチャ生成 ---
     function createRoadTexture() {
       const cvs = document.createElement('canvas');
       cvs.width = 1024; cvs.height = 1024;
       const ctx = cvs.getContext('2d');
-      ctx.fillStyle = '#1e2126';
+      ctx.fillStyle = '#1c1f24';
       ctx.fillRect(0, 0, 1024, 1024);
 
-      for (let i = 0; i < 10000; i++) {
+      for (let i = 0; i < 9000; i++) {
         ctx.fillStyle = Math.random() < 0.5 ? '#15171b' : '#282c34';
         ctx.fillRect(Math.random() * 1024, Math.random() * 1024, 3, 3);
       }
 
-      // タイヤ痕
       ctx.fillStyle = 'rgba(10, 10, 12, 0.4)';
       for (let i = 0; i < 8; i++) {
         const tx = 200 + Math.random() * 624;
@@ -600,7 +538,6 @@
       const cvs = document.createElement('canvas');
       cvs.width = 256; cvs.height = 256;
       const ctx = cvs.getContext('2d');
-
       ctx.fillStyle = isPos ? 'rgba(30, 58, 138, 0.88)' : 'rgba(127, 29, 29, 0.88)';
       ctx.fillRect(0, 0, 256, 256);
 
@@ -621,269 +558,102 @@
       return new THREE.CanvasTexture(cvs);
     }
 
-    // --- 【脱・ローポリ】滑らかな曲面3Dモデル生成 ---
-    // 現代兵士モデル（カプセル・球・有機的パーツ構造）
-    function createModernSoldier(isLeader = false) {
-      const g = new THREE.Group();
+    // --- 本物のアセットからキャラクター生成（SkeletonUtils.clone） ---
+    function spawnSoldierInstance(isLeader = false) {
+      const model = THREE.SkeletonUtils.clone(baseSoldierModel);
+      model.scale.set(1.15, 1.15, 1.15);
 
-      if (!matCache.camo) {
-        matCache.camo = new THREE.MeshStandardMaterial({
-          map: createCamoTexture(),
-          roughness: 0.75,
-          metalness: 0.1
-        });
-        matCache.vest = new THREE.MeshStandardMaterial({
-          color: 0x292524,
-          roughness: 0.6,
-          metalness: 0.2
-        });
-        matCache.armor = new THREE.MeshStandardMaterial({
-          color: 0x1c1917,
-          roughness: 0.4,
-          metalness: 0.4
-        });
-        matCache.metal = new THREE.MeshStandardMaterial({
-          color: 0x09090b,
-          roughness: 0.25,
-          metalness: 0.85
-        });
-      }
+      // アニメーションミキサー
+      const mixer = new THREE.AnimationMixer(model);
+      // Run: animations[1], Walk: animations[3], Idle: animations[0]
+      const runClip = soldierAnimations[1] || soldierAnimations[0];
+      const runAction = mixer.clipAction(runClip);
+      runAction.play();
 
-      // トルソー（丸みのあるチェストカプセル）
-      const chestGeo = new THREE.CylinderGeometry(0.26, 0.22, 0.65, 12);
-      const chest = new THREE.Mesh(chestGeo, isLeader ? new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.6 }) : matCache.camo);
-      chest.position.y = 0.65;
-      chest.castShadow = true;
-      g.add(chest);
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          child.material = child.material.clone();
+          if (isLeader) {
+            child.material.color.setHex(0x93c5fd); // リーダーは青系迷彩
+          }
+        }
+      });
 
-      // 防弾ベスト
-      const vestGeo = new THREE.CylinderGeometry(0.28, 0.26, 0.45, 12);
-      const vest = new THREE.Mesh(vestGeo, matCache.vest);
-      vest.position.y = 0.68;
-      vest.castShadow = true;
-      g.add(vest);
-
-      // 肩アーマー（球形パッディング）
-      const shoulderGeo = new THREE.SphereGeometry(0.12, 10, 10);
-      const shL = new THREE.Mesh(shoulderGeo, matCache.vest);
-      shL.position.set(-0.32, 0.85, 0);
-      shL.castShadow = true;
-      const shR = shL.clone();
-      shR.position.x = 0.32;
-      g.add(shL, shR);
-
-      // 腕（カプセル形状）
-      const armGeo = new THREE.CylinderGeometry(0.08, 0.07, 0.45, 10);
-      const armL = new THREE.Mesh(armGeo, matCache.camo);
-      armL.position.set(-0.32, 0.58, 0.05);
-      armL.castShadow = true;
-
-      const armR = new THREE.Mesh(armGeo, matCache.camo);
-      armR.position.set(0.32, 0.58, -0.05);
-      armR.rotation.x = -Math.PI / 4;
-      armR.castShadow = true;
-      g.add(armL, armR);
-
-      // 頭部（丸い顔・ヘルメット）
-      const headGeo = new THREE.SphereGeometry(0.18, 14, 14);
-      const head = new THREE.Mesh(headGeo, new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.8 }));
-      head.position.y = 1.15;
-      head.castShadow = true;
-
-      // ケブラーヘルメット（ラウンドシェル）
-      const helmetGeo = new THREE.SphereGeometry(0.21, 14, 14, 0, Math.PI * 2, 0, Math.PI * 0.55);
-      const helmet = new THREE.Mesh(helmetGeo, matCache.armor);
-      helmet.position.y = 1.18;
-      helmet.castShadow = true;
-
-      // ゴーグル（曲面バイザー）
-      const goggleGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.09, 12, 1, false, Math.PI * 0.25, Math.PI * 0.5);
-      const goggle = new THREE.Mesh(goggleGeo, new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.1, metalness: 0.9 }));
-      goggle.rotation.y = Math.PI;
-      goggle.position.set(0, 1.16, -0.08);
-      g.add(head, helmet, goggle);
-
-      // アサルトライフル（M4/HK416）
-      const gun = new THREE.Group();
-      const gunBody = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.7, 8), matCache.metal);
-      gunBody.rotation.x = Math.PI / 2;
-      const mag = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.22, 6), matCache.metal);
-      mag.position.set(0, -0.1, -0.05);
-      const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 8), matCache.metal);
-      scope.rotation.x = Math.PI / 2;
-      scope.position.set(0, 0.06, 0);
-      gun.add(gunBody, mag, scope);
-      gun.position.set(0.26, 0.65, -0.35);
-      gun.castShadow = true;
-      g.add(gun);
-
-      // マズルフラッシュ
-      const flashMat = new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0 });
-      const flash = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), flashMat);
-      flash.position.set(0.26, 0.65, -0.75);
-      g.add(flash);
-
-      // 脚部（カプセル）
-      const legGeo = new THREE.CylinderGeometry(0.09, 0.075, 0.45, 10);
-      const legL = new THREE.Mesh(legGeo, matCache.camo);
-      legL.position.set(-0.14, 0.22, 0);
-      legL.castShadow = true;
-      const legR = legL.clone();
-      legR.position.x = 0.14;
-      g.add(legL, legR);
-
-      return { group: g, legL, legR, flashMat };
+      return { model, mixer };
     }
 
-    // 有機的ゾンビモデル（カプセル・猫背・曲面筋骨格）
-    function createOrganicZombie(type = 'normal') {
-      const g = new THREE.Group();
+    function spawnZombieInstance(type = 'normal') {
+      const model = THREE.SkeletonUtils.clone(baseSoldierModel);
+      let scale = 1.15;
+      if (type === 'runner') scale = 0.95;
+      if (type === 'tank') scale = 1.9;
 
-      if (!matCache.zombieSkin) {
-        matCache.zombieSkin = new THREE.MeshStandardMaterial({
-          map: createZombieSkinTexture(),
-          roughness: 0.85,
-          metalness: 0.05,
-          emissive: 0x000000
-        });
-        matCache.zombieCloth = new THREE.MeshStandardMaterial({
-          color: 0x3f3f46,
-          roughness: 0.9,
-          metalness: 0.05,
-          emissive: 0x000000
-        });
-        matCache.runnerCloth = new THREE.MeshStandardMaterial({
-          color: 0x991b1b,
-          roughness: 0.9,
-          metalness: 0.05,
-          emissive: 0x000000
-        });
-      }
+      model.scale.set(scale, scale, scale);
 
-      let scale = 1.0;
-      let clothMat = matCache.zombieCloth;
+      const mixer = new THREE.AnimationMixer(model);
+      let clip = soldierAnimations[3] || soldierAnimations[0]; // Walk
+      let animSpeed = 0.85;
 
       if (type === 'runner') {
-        scale = 0.85;
-        clothMat = matCache.runnerCloth;
-      } else if (type === 'tank') {
-        scale = 1.65;
+        clip = soldierAnimations[1]; // Run
+        animSpeed = 1.4;
       }
+      const action = mixer.clipAction(clip);
+      action.timeScale = animSpeed;
+      action.play();
 
-      // 猫背のトルソー
-      const spineGeo = new THREE.CylinderGeometry(0.24 * scale, 0.18 * scale, 0.6 * scale, 12);
-      const spine = new THREE.Mesh(spineGeo, clothMat);
-      spine.position.set(0, 0.6 * scale, 0.08 * scale);
-      spine.rotation.x = 0.25; // 前傾
-      spine.castShadow = true;
-      g.add(spine);
+      const mats = [];
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          child.material = child.material.clone();
 
-      // 異常発達した肩
-      const shGeo = new THREE.SphereGeometry(0.14 * scale, 10, 10);
-      const shL = new THREE.Mesh(shGeo, matCache.zombieSkin);
-      shL.position.set(-0.32 * scale, 0.82 * scale, 0.15 * scale);
-      shL.castShadow = true;
-      const shR = shL.clone();
-      shR.position.x = 0.32 * scale;
-      g.add(shL, shR);
+          if (type === 'runner') {
+            child.material.color.setHex(0x991b1b); // 血染めランナー
+          } else if (type === 'tank') {
+            child.material.color.setHex(0x1e293b); // 黒変異タンク
+          } else {
+            child.material.color.setHex(0x3f624d); // 腐敗グリーン
+          }
+          child.material.roughness = 0.85;
+          mats.push(child.material);
+        }
+      });
 
-      // 突き出された腕（カプセル）
-      const armGeo = new THREE.CylinderGeometry(0.08 * scale, 0.06 * scale, 0.65 * scale, 10);
-      const armL = new THREE.Mesh(armGeo, matCache.zombieSkin);
-      armL.position.set(-0.32 * scale, 0.72 * scale, 0.42 * scale);
-      armL.rotation.x = Math.PI / 2 + 0.1;
-      armL.castShadow = true;
+      // ゾンビらしく前進方向へ反転
+      model.rotation.y = Math.PI;
 
-      const armR = new THREE.Mesh(armGeo, matCache.zombieSkin);
-      armR.position.set(0.32 * scale, 0.72 * scale, 0.42 * scale);
-      armR.rotation.x = Math.PI / 2 - 0.1;
-      armR.castShadow = true;
-      g.add(armL, armR);
-
-      // 有機的な頭部（球体＋顎）
-      const headGeo = new THREE.SphereGeometry(0.18 * scale, 12, 12);
-      const head = new THREE.Mesh(headGeo, matCache.zombieSkin);
-      head.position.set(0, 1.05 * scale, 0.25 * scale);
-      head.rotation.z = (Math.random() - 0.5) * 0.3; // 首かしげ
-      head.castShadow = true;
-
-      // 爛々と光る赤い眼球
-      const eyeGeo = new THREE.SphereGeometry(0.04 * scale, 8, 8);
-      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0033 });
-      const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
-      eyeL.position.set(-0.07 * scale, 1.08 * scale, 0.41 * scale);
-      const eyeR = eyeL.clone();
-      eyeR.position.x = 0.07 * scale;
-      g.add(head, eyeL, eyeR);
-
-      // 脚部
-      const legGeo = new THREE.CylinderGeometry(0.09 * scale, 0.075 * scale, 0.45 * scale, 10);
-      const legL = new THREE.Mesh(legGeo, clothMat);
-      legL.position.set(-0.14 * scale, 0.22 * scale, 0);
-      legL.castShadow = true;
-      const legR = legL.clone();
-      legR.position.x = 0.14 * scale;
-      g.add(legL, legR);
-
-      if (type === 'runner') g.rotation.x = 0.35; // 狂暴ダッシュ
-
-      return { group: g, legL, legR, skinMat: matCache.zombieSkin, clothMat, scale };
+      return { model, mixer, mats, scale };
     }
 
-    // 変異巨獣ボス（GOLIATH）
-    function createGoliathBoss() {
-      const g = new THREE.Group();
-      const skinMat = new THREE.MeshStandardMaterial({
-        color: 0x1f2937,
-        roughness: 0.85,
-        metalness: 0.1,
-        emissive: 0x000000
+    function spawnGoliathBossInstance() {
+      const model = THREE.SkeletonUtils.clone(baseSoldierModel);
+      const scale = 3.6; // 超巨大！
+      model.scale.set(scale, scale, scale);
+
+      const mixer = new THREE.AnimationMixer(model);
+      const clip = soldierAnimations[3] || soldierAnimations[0]; // Walk
+      const action = mixer.clipAction(clip);
+      action.timeScale = 0.55; // 重厚なスロー歩行
+      action.play();
+
+      const mats = [];
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          child.material = child.material.clone();
+          child.material.color.setHex(0x450a0a); // ドス黒い赤
+          child.material.roughness = 0.9;
+          mats.push(child.material);
+        }
       });
-      const coreMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
 
-      // 巨大筋肉トルソー
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.2, 3.4, 16), skinMat);
-      body.position.y = 2.6;
-      body.rotation.x = 0.2;
-      body.castShadow = true;
-      g.add(body);
-
-      // 脈打つ胸の変異コア
-      const core = new THREE.Mesh(new THREE.SphereGeometry(0.65, 12, 12), coreMat);
-      core.position.set(0, 3.0, 1.3);
-      g.add(core);
-
-      // 隆起した肩僧帽筋
-      const shGeo = new THREE.SphereGeometry(0.9, 14, 14);
-      const shL = new THREE.Mesh(shGeo, skinMat);
-      shL.position.set(-2.2, 3.5, 0.4);
-      shL.castShadow = true;
-      const shR = shL.clone();
-      shR.position.x = 2.2;
-      g.add(shL, shR);
-
-      // 丸太のような巨腕
-      const armGeo = new THREE.CylinderGeometry(0.55, 0.45, 3.2, 12);
-      const armL = new THREE.Mesh(armGeo, skinMat);
-      armL.position.set(-2.2, 2.5, 1.5);
-      armL.rotation.x = Math.PI / 2.2;
-      armL.castShadow = true;
-      const armR = new THREE.Mesh(armGeo, skinMat);
-      armR.position.set(2.2, 2.5, 1.5);
-      armR.rotation.x = Math.PI / 2.2;
-      armR.castShadow = true;
-      g.add(armL, armR);
-
-      // 醜悪な頭部
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.85, 14, 14), skinMat);
-      head.position.set(0, 4.6, 0.8);
-      head.castShadow = true;
-
-      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.2, 0.1), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
-      eye.position.set(0, 4.7, 1.6);
-      g.add(head, eye);
-
-      return { group: g, skinMat, core };
+      model.rotation.y = Math.PI;
+      return { model, mixer, mats };
     }
 
     // --- 初期セットアップ ---
@@ -904,12 +674,12 @@
       renderer.setSize(w, h);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap; // 柔らかな映画的落ち影
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.25;
       container.appendChild(renderer.domElement);
 
-      // ライティング
+      // 太陽光ライティング
       const hemiLight = new THREE.HemisphereLight(0xbae6fd, 0x0284c7, 0.75);
       scene.add(hemiLight);
 
@@ -927,12 +697,12 @@
       sunLight.shadow.bias = -0.0004;
       scene.add(sunLight);
 
-      // 射撃用リアルタイムマズル閃光ライト
+      // マズル閃光ライト
       muzzleLight = new THREE.PointLight(0xfef08a, 0, 8, 2);
       muzzleLight.position.set(0, 1.5, DEFENSE_Z);
       scene.add(muzzleLight);
 
-      // 1. 海面
+      // 海面
       waterMatRef = createWaterTexture();
       const seaMat = new THREE.MeshStandardMaterial({
         map: waterMatRef,
@@ -946,7 +716,7 @@
       sea.receiveShadow = true;
       scene.add(sea);
 
-      // 2. ベイブリッジ（高精細アスファルト）
+      // ベイブリッジ
       roadMatRef = createRoadTexture();
       const roadMat = new THREE.MeshStandardMaterial({
         map: roadMatRef,
@@ -958,7 +728,7 @@
       road.receiveShadow = true;
       scene.add(road);
 
-      // 3. 金属ガードレール
+      // ガードレール
       const railMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.4, metalness: 0.7 });
       const railL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.7, 130), railMat);
       railL.position.set(-BRIDGE_WIDTH / 2, 0.35, -35);
@@ -967,7 +737,7 @@
       railR.position.x = BRIDGE_WIDTH / 2;
       scene.add(railL, railR);
 
-      // 4. 吊り橋主塔
+      // 吊り橋主塔
       const towerMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.6, metalness: 0.2 });
       for (let z of [-80, -20]) {
         const pillarL = new THREE.Mesh(new THREE.BoxGeometry(1.4, 48, 1.8), towerMat);
@@ -981,7 +751,7 @@
         scene.add(pillarL, pillarR, beam);
       }
 
-      // 吊り橋ケーブル
+      // ケーブル
       const cableMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.3, metalness: 0.8 });
       const cableL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 130), cableMat);
       cableL.rotation.x = Math.PI / 2;
@@ -990,7 +760,7 @@
       cableR.position.x = BRIDGE_WIDTH / 2 + 1.2;
       scene.add(cableL, cableR);
 
-      // 防衛境界ライン
+      // 防衛ライン
       const defLine = new THREE.Mesh(
         new THREE.BoxGeometry(BRIDGE_WIDTH, 0.06, 0.4),
         new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 })
@@ -1002,7 +772,39 @@
       setupUltButton();
 
       window.addEventListener('resize', onResize);
-      animate();
+
+      // --- 外部3Dアセット（Soldier.glb）のダウンロード ---
+      loadExternal3DAssets();
+    }
+
+    function loadExternal3DAssets() {
+      const loader = new THREE.GLTFLoader();
+      const assetUrl = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/models/gltf/Soldier.glb';
+
+      loader.load(
+        assetUrl,
+        (gltf) => {
+          baseSoldierModel = gltf.scene;
+          soldierAnimations = gltf.animations;
+
+          // ロード完了
+          document.getElementById('loading-box').style.display = 'none';
+          document.getElementById('start-btn').style.display = 'block';
+          animate();
+        },
+        (xhr) => {
+          if (xhr.total > 0) {
+            const pct = Math.floor((xhr.loaded / xhr.total) * 100);
+            document.getElementById('loading-text').innerText = `DOWNLOADING 3D ASSETS... (${pct}%)`;
+            document.getElementById('loading-fill').style.width = `${pct}%`;
+          }
+        },
+        (err) => {
+          const eb = document.getElementById('error-box');
+          eb.style.display = 'block';
+          eb.innerText = '3D Asset Load Failed. Check network connection.';
+        }
+      );
     }
 
     // --- 入力制御 ---
@@ -1051,7 +853,7 @@
         if (idx === 0) { m.offsetX = 0; m.offsetZ = 0; return; }
         const row = Math.floor(Math.sqrt(idx));
         const col = idx - row * row;
-        const spX = 0.52; const spZ = 0.62;
+        const spX = 0.58; const spZ = 0.68;
         m.offsetX = -((row * spX) / 2) + col * spX;
         m.offsetZ = row * spZ;
       });
@@ -1062,15 +864,12 @@
       const cur = squadMembers.length;
       const target = Math.min(60, cur + cnt);
       for (let i = cur; i < target; i++) {
-        const u = createModernSoldier(false);
-        u.group.position.set(playerLeaderX, 0, DEFENSE_Z);
-        u.group.scale.set(0.1, 0.1, 0.1);
-        scene.add(u.group);
+        const u = spawnSoldierInstance(false);
+        u.model.position.set(playerLeaderX, 0, DEFENSE_Z);
+        scene.add(u.model);
         squadMembers.push({
-          mesh: u.group,
-          legL: u.legL,
-          legR: u.legR,
-          flashMat: u.flashMat,
+          mesh: u.model,
+          mixer: u.mixer,
           offsetX: 0,
           offsetZ: 0
         });
@@ -1239,59 +1038,11 @@
       else btn.classList.remove('ready');
     }
 
-    // --- 補給選択 ---
-    function showUpgradeSelection() {
-      isPlaying = false;
-      const screen = document.getElementById('upgrade-screen');
-      const container = document.getElementById('upgrade-cards');
-      container.innerHTML = '';
-
-      const options = [
-        { id: 'rate', title: '⚡ 超高速ガトリング機構', desc: '小隊の射撃レートが＋40%跳ね上がる' },
-        { id: 'pierce', title: '🎯 50口径フルメタルジャケット', desc: '弾丸がゾンビを複数体貫通して後ろの群れもミンチにする' },
-        { id: 'gunship', title: '🚁 対地支援攻撃ヘリ', desc: '上空からガトリングでゾンビの大群を掃討するヘリを召喚' }
-      ];
-
-      options.forEach(opt => {
-        const card = document.createElement('div');
-        card.className = 'up-card';
-        card.innerHTML = `<div class="up-title">${opt.title}</div><div class="up-desc">${opt.desc}</div>`;
-        card.onclick = () => {
-          applyUpgrade(opt.id);
-          screen.style.display = 'none';
-          isPlaying = true;
-        };
-        container.appendChild(card);
-      });
-
-      screen.style.display = 'flex';
-    }
-
-    function applyUpgrade(id) {
-      if (id === 'rate') fireRateMult *= 1.4;
-      if (id === 'pierce') hasArmorPiercing = true;
-      if (id === 'gunship' && !hasGunshipSupport) {
-        hasGunshipSupport = true;
-        const hg = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 2.2, 12), new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.6 }));
-        body.rotation.x = Math.PI / 2;
-        body.castShadow = true;
-        const rotor = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.06, 0.2), new THREE.MeshBasicMaterial({ color: 0x0f172a }));
-        rotor.position.y = 0.45;
-        hg.add(body, rotor);
-        hg.rotor = rotor;
-        gunshipMesh = hg;
-        scene.add(gunshipMesh);
-      }
-      playSfx('rifle');
-    }
-
     // --- スタート / リセット ---
     function startGame() {
       initAudio();
       document.getElementById('start-screen').style.display = 'none';
       document.getElementById('result-screen').style.display = 'none';
-      document.getElementById('upgrade-screen').style.display = 'none';
 
       squadMembers.forEach(m => scene.remove(m.mesh));
       bullets.forEach(b => scene.remove(b.mesh));
@@ -1300,7 +1051,6 @@
       particles.forEach(p => scene.remove(p.mesh));
       shellCasings.forEach(sc => scene.remove(sc.mesh));
       if (boss) scene.remove(boss.mesh);
-      if (gunshipMesh) scene.remove(gunshipMesh);
 
       squadMembers = [];
       bullets = [];
@@ -1309,30 +1059,24 @@
       particles = [];
       shellCasings = [];
       boss = null;
-      gunshipMesh = null;
 
       score = 0;
       gameTime = 0;
       spawnTimer = 0;
       gateTimer = 1.0;
-      waveCount = 1;
       shakeIntensity = 0;
       ultGauge = 0;
       isUltReady = false;
-      fireRateMult = 1.0;
-      hasArmorPiercing = false;
-      hasGunshipSupport = false;
       playerLeaderX = 0;
       targetX = 0;
 
-      const leader = createModernSoldier(true);
-      leader.group.position.set(0, 0, DEFENSE_Z);
-      scene.add(leader.group);
+      // 自軍リーダーの出撃（本物の3D兵士モデル）
+      const leader = spawnSoldierInstance(true);
+      leader.model.position.set(0, 0, DEFENSE_Z);
+      scene.add(leader.model);
       squadMembers.push({
-        mesh: leader.group,
-        legL: leader.legL,
-        legR: leader.legR,
-        flashMat: leader.flashMat,
+        mesh: leader.model,
+        mixer: leader.mixer,
         offsetX: 0,
         offsetZ: 0
       });
@@ -1409,7 +1153,6 @@
 
     // --- メインループ ---
     let shootCool = 0;
-    let gunshipAngle = 0;
 
     function animate() {
       requestAnimationFrame(animate);
@@ -1434,44 +1177,24 @@
           if (shakeIntensity < 0.01) { shakeIntensity = 0; camera.position.set(0, 16, 24); }
         }
 
-        // マズル閃光ライトの減衰
-        if (muzzleLight.intensity > 0) {
-          muzzleLight.intensity -= 0.6;
-        }
+        if (muzzleLight.intensity > 0) muzzleLight.intensity -= 0.6;
 
         playerLeaderX += (targetX - playerLeaderX) * 0.22;
 
-        if (hasGunshipSupport && gunshipMesh) {
-          gunshipAngle += 0.04;
-          gunshipMesh.rotor.rotation.y += 0.4;
-          gunshipMesh.position.set(
-            playerLeaderX + Math.cos(gunshipAngle) * 3.0,
-            4.5,
-            DEFENSE_Z + Math.sin(gunshipAngle) * 2.0
-          );
-        }
-
-        // 歩行・リコイルアニメーション
-        const walkCycle = Math.sin(gameTime * 24);
+        // 味方兵士の更新（ボーンアニメーション＆隊列移動）
         squadMembers.forEach(m => {
           m.mesh.position.x += (playerLeaderX + m.offsetX - m.mesh.position.x) * 0.25;
           m.mesh.position.z += (DEFENSE_Z + m.offsetZ - m.mesh.position.z) * 0.25;
-          if (m.mesh.scale.x < 1.0) m.mesh.scale.addScalar(0.1);
-          m.legL.rotation.x = walkCycle * 0.6;
-          m.legR.rotation.x = -walkCycle * 0.6;
-          m.mesh.position.y = Math.abs(walkCycle) * 0.08;
-
-          if (m.flashMat.opacity > 0) m.flashMat.opacity -= 0.25;
+          if (m.mixer) m.mixer.update(delta);
         });
 
         // 射撃ロジック
         shootCool -= delta;
-        const cooldown = 0.14 / fireRateMult;
+        const cooldown = 0.13;
         if (shootCool <= 0) {
           shootCool = cooldown;
           playSfx('rifle');
 
-          // マズル閃光ライト点灯
           muzzleLight.position.set(playerLeaderX, 1.2, DEFENSE_Z - 0.5);
           muzzleLight.intensity = 2.4;
 
@@ -1480,26 +1203,18 @@
               new THREE.SphereGeometry(0.16, 6, 6),
               new THREE.MeshBasicMaterial({ color: 0xf59e0b })
             );
-            b.position.set(m.mesh.position.x + 0.26, 0.65, m.mesh.position.z - 0.4);
+            b.position.set(m.mesh.position.x + 0.26, 0.75, m.mesh.position.z - 0.5);
             scene.add(b);
 
             bullets.push({
               mesh: b,
-              vz: -0.78,
+              vz: -0.82,
               vx: (Math.random() - 0.5) * 0.02,
-              penetration: hasArmorPiercing ? 3 : 1
+              penetration: 2
             });
 
-            m.flashMat.opacity = 1.0;
-            spawnCasing(m.mesh.position.x + 0.35, 0.65, m.mesh.position.z - 0.2);
+            spawnCasing(m.mesh.position.x + 0.35, 0.75, m.mesh.position.z - 0.2);
           });
-
-          if (hasGunshipSupport && gunshipMesh) {
-            const hb = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 6), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
-            hb.position.copy(gunshipMesh.position);
-            scene.add(hb);
-            bullets.push({ mesh: hb, vz: -0.88, vx: 0, penetration: 3, isCrit: true });
-          }
         }
 
         gateTimer -= delta;
@@ -1508,7 +1223,7 @@
           gateTimer = 8.5;
         }
 
-        // ゾンビ大群スポーン
+        // ゾンビ大群スポーン（本物のアセットモデル）
         spawnTimer -= delta;
         if (spawnTimer <= 0 && !boss) {
           const hordeCount = Math.floor(Math.random() * 3) + 3;
@@ -1519,9 +1234,9 @@
             const x = (Math.random() - 0.5) * (BRIDGE_WIDTH - 1.5);
             const zOffset = -65 - Math.random() * 8;
 
-            const zObj = createOrganicZombie(type);
-            zObj.group.position.set(x, 0, zOffset);
-            scene.add(zObj.group);
+            const zObj = spawnZombieInstance(type);
+            zObj.model.position.set(x, 0, zOffset);
+            scene.add(zObj.model);
 
             let hp = 3;
             let spd = 0.09 + Math.random() * 0.02;
@@ -1529,36 +1244,28 @@
             if (type === 'tank') { hp = 15; spd = 0.045; }
 
             zombies.push({
-              mesh: zObj.group,
-              legL: zObj.legL,
-              legR: zObj.legR,
-              skinMat: zObj.skinMat,
-              clothMat: zObj.clothMat,
+              mesh: zObj.model,
+              mixer: zObj.mixer,
+              mats: zObj.mats,
               hp,
               type,
-              speed: spd,
-              wobbleSeed: Math.random() * 10
+              speed: spd
             });
           }
 
           spawnTimer = Math.max(0.35, 1.1 - gameTime * 0.015);
         }
 
-        if (waveCount === 1 && gameTime > 20) {
-          waveCount = 2;
-          showUpgradeSelection();
-        }
-
-        // ボス出現
-        if (!boss && (gameTime > 42 || score >= 200)) {
-          const bObj = createGoliathBoss();
-          bObj.group.position.set(0, 0, -75);
-          scene.add(bObj.group);
+        // 巨大ボスの出現
+        if (!boss && (gameTime > 42 || score >= 180)) {
+          const bObj = spawnGoliathBossInstance();
+          bObj.model.position.set(0, 0, -75);
+          scene.add(bObj.model);
 
           boss = {
-            mesh: bObj.group,
-            skinMat: bObj.skinMat,
-            core: bObj.core,
+            mesh: bObj.model,
+            mixer: bObj.mixer,
+            mats: bObj.mats,
             hp: 300,
             maxHp: 300,
             speed: 0.024
@@ -1611,7 +1318,7 @@
               const hitRadius = z.type === 'tank' ? 1.4 : 0.85;
 
               if (z.mesh.position.distanceTo(b.mesh.position) < hitRadius) {
-                const isCrit = b.isCrit || Math.random() < 0.2;
+                const isCrit = Math.random() < 0.2;
                 const dmg = isCrit ? 3 : 1;
                 z.hp -= dmg;
                 b.penetration--;
@@ -1622,12 +1329,10 @@
                 showDamageNumber(dmg, b.mesh.position.x, 1.2, b.mesh.position.z, isCrit);
                 spawnMeatDebris(b.mesh.position.x, 0.7, b.mesh.position.z, 0x5a7d65, 3);
 
-                // ヒットストロボ（白点滅）
-                z.skinMat.emissive.setHex(0xffffff);
-                z.clothMat.emissive.setHex(0xffffff);
+                // ヒットストロボフラッシュ
+                z.mats.forEach(mat => mat.emissive.setHex(0xffffff));
                 setTimeout(() => {
-                  z.skinMat.emissive.setHex(0x000000);
-                  z.clothMat.emissive.setHex(0x000000);
+                  z.mats.forEach(mat => mat.emissive.setHex(0x000000));
                 }, 60);
 
                 z.mesh.position.z -= 0.18;
@@ -1658,8 +1363,10 @@
               showDamageNumber(dmg, bx, 2.5, bz, isCrit);
               updateBossHp();
 
-              boss.skinMat.emissive.setHex(0xffffff);
-              setTimeout(() => { boss.skinMat.emissive.setHex(0x000000); }, 60);
+              boss.mats.forEach(mat => mat.emissive.setHex(0xffffff));
+              setTimeout(() => {
+                boss.mats.forEach(mat => mat.emissive.setHex(0x000000));
+              }, 60);
 
               if (boss.hp <= 0) {
                 spawnMeatDebris(bx, 3.0, bz, 0xef4444, 80);
@@ -1681,15 +1388,11 @@
           }
         }
 
-        // --- 2. ゾンビの移動＆アニメ ---
+        // --- 2. ゾンビの移動＆アニメ更新 ---
         for (let i = zombies.length - 1; i >= 0; i--) {
           const z = zombies[i];
           z.mesh.position.z += z.speed;
-
-          const zWalk = Math.sin(gameTime * 15 + z.wobbleSeed);
-          z.legL.rotation.x = zWalk * 0.7;
-          z.legR.rotation.x = -zWalk * 0.7;
-          z.mesh.rotation.z = Math.sin(gameTime * 8 + z.wobbleSeed) * 0.08;
+          if (z.mixer) z.mixer.update(delta);
 
           if (z.mesh.position.z >= DEFENSE_Z) {
             playSfx('splat');
@@ -1706,10 +1409,11 @@
           }
         }
 
-        // ボス移動
+        // ボス移動＆アニメ
         if (boss) {
           boss.mesh.position.z += boss.speed;
-          boss.mesh.position.y = Math.sin(gameTime * 8) * 0.2;
+          if (boss.mixer) boss.mixer.update(delta);
+
           if (boss.mesh.position.z >= DEFENSE_Z - 1.5) {
             endGame(false);
             return;
@@ -1769,7 +1473,7 @@
       renderer.render(scene, camera);
     }
 
-    // --- ゲームオーバー / クリア ---
+    // --- リザルト画面 ---
     function endGame(isClear) {
       isPlaying = false;
       const res = document.getElementById('result-screen');
