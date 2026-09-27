@@ -378,7 +378,7 @@ const ZDEF={
 };
 const CHAR_DEF={
   leader:{scale:1.1}, soldier:{scale:1.04}, normal:{scale:1.06}, runner:{scale:1.0},
-  tank:{scale:1.38}, spitter:{scale:1.1}, boss:{scale:2.9}
+  tank:{scale:1.38}, spitter:{scale:1.1}, boss:{scale:3.3}
 };
 const CRATE_DEF={
   rate:{label:'RATE UP', icon:'⚡', color:'#38bdf8', hex:0x38bdf8},
@@ -514,9 +514,9 @@ function buildResources(){
   R.carMat2=new THREE.MeshStandardMaterial({color:0x1f1f1f,roughness:0.7,metalness:0.4});
   R.missileMat=new THREE.MeshStandardMaterial({color:0xd1d5db,metalness:0.6,roughness:0.35});
   R.flameMat=new THREE.MeshBasicMaterial({color:0xffb347,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false});
-  R.flashMat=new THREE.MeshBasicMaterial({map:makeFlashTexture(),color:0xffffff,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+  R.flashMat=new THREE.MeshBasicMaterial({map:makeFlashTexture(),color:0xc9905a,opacity:0.55,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
   R.tracerTex={
-    normal:makeTracerTex(['#ffffff','#fef08a','#f97316','rgba(239,68,68,0)']),
+    normal:makeTracerTex(['#fff3c4','#e8c46a','#b8601c','rgba(120,40,20,0)']),
     amp:makeTracerTex(['#ffffff','#7dd3fc','#0284c7','rgba(2,132,199,0)']),
     exp:makeTracerTex(['#ffffff','#fdba74','#ef4444','rgba(127,29,29,0)'])
   };
@@ -770,7 +770,7 @@ class Particles{
 }
 function buildParticles(){
   P.debris=new Particles(R.ico,new THREE.MeshLambertMaterial({color:0xffffff}),480,{gravity:22,ground:true,bounce:0.3});
-  const softT=makeSoftTex(), smokeT=makeSmokeTex(), quad=new THREE.PlaneGeometry(1,1);
+  const softT=makeSoftTex(), smokeT=makeSmokeTex(), quad=new THREE.PlaneGeometry(1,1); R.softTex=softT;
   P.smoke=new Particles(quad,softMat(smokeT,false),340,{gravity:-2.2,drag:1.1,billboard:true,alpha:true,sizeMul:2.6,fadeIn:0.15,fadeOut:0.6,spin:0.4});
   P.mist=new Particles(quad,softMat(smokeT,false),120,{gravity:1.5,drag:3,billboard:true,alpha:true,sizeMul:2.4,fadeIn:0.05,fadeOut:0.7,spin:0.6});
   P.fire=new Particles(quad,softMat(softT,true),300,{gravity:-3,drag:3,billboard:true,alpha:true,sizeMul:2.6,fadeIn:0.05,fadeOut:0.5,colorFn:(p,t,c)=>{ c.setRGB(1,0.92-0.55*t,0.6-0.55*t); }});
@@ -1110,7 +1110,7 @@ function buildToonChar(kind){
   let core=null;
   if(kind==='boss'){ core=new THREE.Mesh(R.sphere,new THREE.MeshBasicMaterial({color:0xff1744})); core.scale.setScalar(0.12); core.position.set(0,1.34,-0.29); root.add(core); }
   root.scale.setScalar(CHAR_DEF[kind].scale); scene.add(root);
-  return {kind,root,B,sp:cg.sp,mats:[bodyMat],core,phase:Math.random()*6.28,hit:0};
+  return {kind,root,B,sp:cg.sp,mats:[bodyMat],core,coreBase:0.12,phase:Math.random()*6.28,hit:0};
 }
 // ================= 3Dモデル（Quaternius製・poly.pizza配布）読み込み =================
 // models/ フォルダに同名ファイルを置けばそちらを優先。無ければ配布元から直接読み込み、失敗時は内蔵トゥーンモデル。
@@ -1123,7 +1123,7 @@ const MODEL_SRC={
   rifle:{files:['models/rifle.glb','https://static.poly.pizza/55ae5e9a-5e18-41b7-a352-dbcfc3c60854.glb'],rifle:true}
 };
 const KIND_MODEL={leader:['soldier'],soldier:['soldier'],normal:['zombieA','zombieD','zombieB'],runner:['zombieB','zombieA','zombieD'],tank:['zombieC','zombieA'],spitter:['zombieD','zombieA'],boss:['zombieC','zombieA']};
-const KIND_TINT={spitter:0xa6e070,boss:0xff8a80,tank:0xc0b8d0};
+const KIND_TINT={spitter:0xa6e070,boss:0xa65a55,tank:0xc0b8d0};
 const GLB={};
 const GRADE_SOLDIER=new THREE.Color(0x4f5a45), GRADE_ZOMBIE=new THREE.Color(0x6a6f58);
 let rifleProto=null;
@@ -1145,7 +1145,7 @@ function prepareGLB(key,gltf){
   const NOT_DIR=/back|left|right|strafe/i;
   const clean=A.filter(c=>!NOT_DIR.test(c.name));
   GLB[key]={scene:sc,scale,yOff:-box.min.y*scale,facesPlusZ,
-    run:pickClip(clean,[/run.*shoot/i,/shoot.*run/i,/run.*gun/i,/run/i,/walk/i,/idle/i])||A[0],
+    run:pickClip(clean,[/idle.*shoot/i,/shoot.*idle/i,/idle.*gun/i,/gun.*idle/i,/^(?!.*(run|walk|jump)).*shoot/i,/idle/i,/run.*shoot/i])||A[0],
     walk:pickClip(clean,[/zombie.*walk/i,/walk/i,/crawl/i,/run/i,/idle/i])||A[0],
     sprint:pickClip(clean,[/zombie.*run/i,/run/i,/walk/i])||A[0],
     death:pickClip(A,[/death/i,/die/i,/dead/i])};
@@ -1166,6 +1166,7 @@ function prepareRifle(sc){
   pivot.quaternion.setFromUnitVectors(dir,new THREE.Vector3(0,0,-1));
   pivot.position.set(0,0,0);
   holder.scale.setScalar(0.95/L);
+  const mz=new THREE.Object3D(); mz.name='muzzle'; mz.position.set(0,0,-L/2); holder.add(mz);
   holder.traverse(o=>{ if(o.isMesh) o.castShadow=true; });
   rifleProto=holder;
 }
@@ -1202,21 +1203,73 @@ function buildGLBChar(kind,key){
   const act=mixer.clipAction(clip); act.timeScale=ts; act.play(); act.time=Math.random()*clip.duration;
   const deathAct=A.death?mixer.clipAction(A.death):null;
   if(deathAct){ deathAct.setLoop(THREE.LoopOnce,1); deathAct.clampWhenFinished=true; }
-  let rifle=null, handR=null;
+  let rifle=null, handR=null, muzzle=null, gripped=false;
   if(isSoldier&&rifleProto){
     rifle=rifleProto.clone(); root.add(rifle);
     handR=findBone(inner,/(hand|fist|wrist).*(\.r$|_r$|right)|right.*hand/i);
     rifle.position.set(0.12,1.25,-0.35);
+    muzzle=rifle.getObjectByName('muzzle');
   }
   let core=null;
-  if(kind==='boss'){ core=new THREE.Mesh(R.sphere,new THREE.MeshBasicMaterial({color:0xff1744})); core.scale.setScalar(0.12); core.position.set(0,1.3,-0.3); root.add(core); }
   if(kind==='spitter'){ const sac=new THREE.Mesh(R.sphere,new THREE.MeshBasicMaterial({color:0xb8f53c})); sac.scale.set(0.16,0.16,0.11); sac.position.set(0,1.1,-0.22); root.add(sac); }
   root.scale.setScalar(CHAR_DEF[kind].scale); scene.add(root);
-  return {kind,root,mixer,act,deathAct,mats,rifle,handR,core,glb:true,phase:Math.random()*6.28,hit:0};
+  const c={kind,root,mixer,act,deathAct,mats,rifle,handR,muzzle,core,glb:true,phase:Math.random()*6.28,hit:0,gripped:false};
+  if(rifle&&handR) gripRifle(c,inner);
+  if(kind==='boss') decorateBoss(c,inner);
+  if(c.core) c.coreBase=c.core.scale.x;
+  return c;
 }
 const _hv=new THREE.Vector3();
+// 構えポーズでの両手の位置から銃の向きを決め、右手の骨に固定（アニメに追従）
+function gripRifle(c,inner){
+  try{
+    const t0=c.act.time; c.act.time=0; c.mixer.update(0); c.root.updateMatrixWorld(true);
+    const lh=findBone(inner,/(hand|fist|wrist).*(\.l$|_l$|left)|left.*hand/i);
+    const pr=new THREE.Vector3(), pl=new THREE.Vector3();
+    c.handR.getWorldPosition(pr); c.root.worldToLocal(pr);
+    let dir=new THREE.Vector3(0,0,-1);
+    if(lh){ lh.getWorldPosition(pl); c.root.worldToLocal(pl); const v=pl.clone().sub(pr); if(v.length()>0.05&&v.z<-0.08){ v.normalize(); dir.lerp(v,0.7).normalize(); } }
+    c.rifle.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,-1),dir);
+    c.rifle.position.copy(pr).addScaledVector(dir,0.2).add(new THREE.Vector3(0,0.02,0));
+    c.rifle.updateMatrixWorld(true);
+    c.handR.attach(c.rifle);
+    c.gripped=true;
+    c.act.time=t0;
+  }catch(e){}
+}
+// ボス：骨に鎧・トゲ・角・光るコアを取り付け、アニメーションに追従させる
+function decorateBoss(c,inner){
+  try{
+    const root=c.root; root.updateMatrixWorld(true);
+    const loc=(b)=>{ const v=new THREE.Vector3(); b.getWorldPosition(v); return root.worldToLocal(v); };
+    const head=findBone(inner,/head/i), hp=head?loc(head):new THREE.Vector3(0,1.55,0);
+    let chest=null, cy=-1e9;
+    inner.traverse(o=>{ if(o.isBone&&/spine|chest|torso/i.test(o.name)){ const q=loc(o); if(q.y>cy&&q.y<hp.y) { cy=q.y; chest=o; } } });
+    const cp=chest?loc(chest):new THREE.Vector3(0,1.2,0);
+    const shL=findBone(inner,/(shoulder|upperarm|arm).*(\.l$|_l$|left)|left.*(shoulder|arm)/i), shR=findBone(inner,/(shoulder|upperarm|arm).*(\.r$|_r$|right)|right.*(shoulder|arm)/i);
+    const boneMat=new THREE.MeshStandardMaterial({color:0xd9ceb4,roughness:0.6}), armor=new THREE.MeshStandardMaterial({color:0x22252b,roughness:0.45,metalness:0.6});
+    const glow=new THREE.MeshBasicMaterial({color:0xff2a2a});
+    const put=(bone,mesh,x,y,z,rx,ry,rz)=>{ mesh.position.set(x,y,z); mesh.rotation.set(rx||0,ry||0,rz||0); mesh.castShadow=true; root.add(mesh); mesh.updateMatrixWorld(true); if(bone) bone.attach(mesh); return mesh; };
+    for(const [bone,sd] of [[shL,-1],[shR,1]]){
+      const sp=bone?loc(bone):new THREE.Vector3(sd*0.2,1.45,0);
+      put(bone,new THREE.Mesh(rb(0.34,0.14,0.4,0.05),armor),sp.x+sd*0.06,sp.y+0.1,sp.z,0,0,-sd*0.3);
+      for(let k=0;k<3;k++) put(bone,new THREE.Mesh(cone(0.05,0.34),boneMat),sp.x+sd*(0.08+k*0.03),sp.y+0.3,sp.z-0.12+k*0.12,0,0,-sd*0.55);
+    }
+    for(let k=0;k<4;k++) put(chest,new THREE.Mesh(cone(0.06,0.36),boneMat),(k%2?0.1:-0.1),cp.y+0.25-k*0.12,cp.z+0.2,0.9,0,0);
+    put(chest,new THREE.Mesh(rb(0.42,0.3,0.1,0.04),armor),0,cp.y+0.05,cp.z-0.18);
+    const core=put(chest,new THREE.Mesh(R.sphere,glow),0,cp.y+0.05,cp.z-0.25); core.scale.multiplyScalar(0.08);
+    for(const sd of [-1,1]){
+      put(head,new THREE.Mesh(cone(0.055,0.34),boneMat),hp.x+sd*0.1,hp.y+0.25,hp.z-0.02,0.35,0,-sd*0.65);
+      put(head,new THREE.Mesh(R.sphere,glow),hp.x+sd*0.06,hp.y+0.14,hp.z-0.13).scale.multiplyScalar(0.03);
+    }
+    const aura=new THREE.Sprite(new THREE.SpriteMaterial({map:R.softTex,color:0xff2a2a,transparent:true,opacity:0.3,depthWrite:false,blending:THREE.AdditiveBlending}));
+    aura.scale.set(1.2,1.2,1); aura.position.set(0,cp.y,cp.z-0.1); root.add(aura);
+    c.core=core; c.aura=aura;
+    for(const m of c.mats){ if(m.emissive){ m.userData.baseE=new THREE.Color(0x220404); m.emissive.copy(m.userData.baseE); } }
+  }catch(e){}
+}
 function placeRifle(c){
-  if(!c.rifle) return;
+  if(!c.rifle||c.gripped) return;
   if(c.handR){
     c.handR.getWorldPosition(_hv); c.root.worldToLocal(_hv);
     if(isFinite(_hv.x)){ c.rifle.position.x+=(_hv.x-c.rifle.position.x)*0.5; c.rifle.position.y+=(Math.max(0.9,Math.min(1.6,_hv.y))-c.rifle.position.y)*0.5; c.rifle.position.z+=(_hv.z-0.25-c.rifle.position.z)*0.5; }
@@ -1237,7 +1290,7 @@ function getChar(kind){
   c.hit=0; setCharFlash(c,0); return c;
 }
 function releaseChar(c){ c.root.visible=false; (charPool[c.kind]||(charPool[c.kind]=[])).push(c); }
-function setCharFlash(c,v){ for(const m of c.mats){ if(m.emissive) m.emissive.setRGB(v,v*0.9,v*0.8); } }
+function setCharFlash(c,v){ for(const m of c.mats){ if(!m.emissive) continue; const b=m.userData.baseE; if(b) m.emissive.setRGB(b.r+v,b.g+v*0.9,b.b+v*0.8); else m.emissive.setRGB(v,v*0.9,v*0.8); } }
 const kneeBend=(ph,amt)=>-Math.max(0,Math.sin(ph))*amt;
 function animSoldier(c,dt,recoil){
   const B=c.B, sp=c.sp; c.phase+=dt*10.5; const ph=c.phase, s=Math.sin(ph);
@@ -1332,15 +1385,17 @@ function spawnBullet(x,y,z,vx,dmg,pen,exp){
   b.x=x;b.y=y;b.z=z;b.oz=z;b.minZ=z-bulletRange();b.vx=vx;b.vz=-BULLET_SPEED;b.dmg=dmg;b.pen=pen;b.exp=exp;b.amp=false;b.hits.length=0;
   bullets.push(b);
 }
+const _mv=new THREE.Vector3();
 function fire(m){
-  const r=m.c.root, sc=r.scale.x, mx=r.position.x+0.1*sc, my=1.38*sc, mz=r.position.z-1.1*sc;
+  const r=m.c.root, sc=r.scale.x; let mx=r.position.x+0.1*sc, my=1.38*sc, mz=r.position.z-1.1*sc;
+  if(m.c.muzzle){ m.c.muzzle.getWorldPosition(_mv); if(isFinite(_mv.x)&&Math.abs(_mv.x-r.position.x)<1.5&&_mv.y>0.3&&_mv.y<2.4){ mx=_mv.x; my=_mv.y; mz=Math.min(_mv.z,r.position.z-0.3); } }
   const dmg=(up.explosive?2.2:1.2)*dmgMul(), pen=1+up.pen;
   for(const sp of SPREADS[up.spread-1]) spawnBullet(mx+sp[0],my,mz,sp[1]*BULLET_SPEED+rand(-0.12,0.12),dmg,pen,up.explosive);
-  m.recoil=1; m.flashT=0.045;
-  m.flash.visible=true; m.flash.position.set(mx,my,mz-0.1); m.flash.rotation.y=Math.random()*6.28; m.flash.scale.setScalar(rand(0.8,1.25)*(up.explosive?1.35:1));
+  m.recoil=1;
+  if(Math.random()<0.55){ m.flashT=0.03; m.flash.visible=true; m.flash.position.set(mx,my,mz-0.05); m.flash.rotation.y=Math.random()*6.28; m.flash.scale.setScalar(rand(0.45,0.6)*(up.explosive?1.2:1)); }
   if(Math.random()<0.6) P.casing.spawn(mx+0.1,my,mz+0.6,rand(2,4),rand(3,5),rand(0.5,2),0.6,1,0xd4a017);
   Sound.play(up.explosive?'shotHeavy':'shot');
-  muzzleLight.position.set(leaderX,1.4,DEFENSE_Z-1.2); muzzleLight.intensity=2.2+up.rate*0.4;
+  muzzleLight.position.set(leaderX,1.4,DEFENSE_Z-1.2); muzzleLight.intensity=Math.max(muzzleLight.intensity,0.35+up.rate*0.08);
 }
 function updateSquad(dt){
   const cd=RATE_CD[up.rate-1]*Math.pow(0.88,up.rateBonus);
@@ -1573,8 +1628,9 @@ function updateBoss(dt){
   p.x+=(clamp(leaderX*0.4,-2,2)-p.x)*Math.min(1,dt*0.5);
   if(b.flash>0){ b.flash=Math.max(0,b.flash-dt*12); setCharFlash(b.c,b.flash*0.7); }
   if(b.c.mixer) b.c.mixer.update(dt); else animZombie(b.c,dt,'boss');
-  if(b.c.core){ b.c.core.scale.setScalar(0.2+Math.sin(b.t*(b.enraged?14:6))*0.05); }
-  b.stompT-=dt; if(b.stompT<=0){ b.stompT=b.enraged?0.55:0.8; if(p.z>-30) shake=Math.max(shake,0.2); }
+  if(b.c.core){ b.c.core.scale.setScalar((b.c.coreBase||0.12)*(1+0.3*Math.sin(b.t*(b.enraged?14:6)))); }
+  if(b.c.aura){ b.c.aura.material.opacity=(b.enraged?0.5:0.3)+0.1*Math.sin(b.t*5); }
+  b.stompT-=dt; if(b.stompT<=0){ b.stompT=b.enraged?0.55:0.8; if(p.z>-30) shake=Math.max(shake,0.2); for(let k=0;k<3;k++){ const d=P.smoke.spawn(p.x+rand(-1.6,1.6),0.3,p.z+rand(-0.8,0.8),rand(-1.5,1.5),rand(0.3,1),rand(-1,1),rand(0.8,1.2),rand(0.5,0.8),0x8a8378,2.5); d.a0=0.45; } }
   b.summon-=dt;
   if(b.summon<=0&&p.z<DEFENSE_Z-12){
     b.summon=(b.enraged?3.2:5)*Math.pow(0.95,stage-1);
@@ -2021,7 +2077,7 @@ function setupFX(){
     if(renderer.capabilities.isWebGL2&&THREE.WebGLMultisampleRenderTarget) rt=new THREE.WebGLMultisampleRenderTarget(viewW*pixelRatio,viewH*pixelRatio,{format:THREE.RGBAFormat});
     composer=new THREE.EffectComposer(renderer,rt);
     composer.addPass(new THREE.RenderPass(scene,camera));
-    bloomPass=new THREE.UnrealBloomPass(new THREE.Vector2(viewW/2,viewH/2),0.55,0.4,0.84);
+    bloomPass=new THREE.UnrealBloomPass(new THREE.Vector2(viewW/2,viewH/2),0.4,0.35,0.9);
     composer.addPass(bloomPass);
     composer.addPass(new THREE.ShaderPass(GRADE_SHADER));
     composer.setPixelRatio(pixelRatio); composer.setSize(viewW,viewH);
