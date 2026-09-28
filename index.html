@@ -193,6 +193,7 @@ button{font-family:inherit;cursor:pointer;-webkit-appearance:none;appearance:non
       <div><b class="c-red">赤ゲート</b>は仲間が減る。撃ち続けると青に反転</div>
       <div>流れてくる<b class="c-gold">武器</b>を取ると持ち替え、<b class="c-gold">強化アイテム</b>で永久強化</div>
       <div><b class="c-green">酸</b>の着弾マークから逃げろ。被弾でコンボ消滅</div>
+      <div>同じ武器を3回取ると<b class="c-gold">進化</b>。赤い<b class="c-red">ドラム缶</b>は撃つと大爆発</div>
       <div>ボス撃破ごとに<b>特殊能力を1つ獲得</b>。階級を上げてハイスコアを狙え</div>
     </div>
     <div id="best-line" class="best"></div>
@@ -316,6 +317,7 @@ const Sound=(()=>{
         case 'shotgun': if(!gate('shot',80)) return; noise(t,0.2,0.26,'lowpass',1400); tone(t,'square',110,40,0.16,0.1); break;
         case 'sniper': if(!gate('shot',80)) return; noise(t,0.12,0.22,'highpass',1800); tone(t,'sawtooth',900,90,0.18,0.08); break;
         case 'launcher': if(!gate('shot',90)) return; tone(t,'sine',200,60,0.2,0.3); noise(t,0.12,0.1,'lowpass',600); break;
+        case 'siren': [0,0.35,0.7].forEach(d=>{ tone(t+d,'square',620,920,0.3,0.06); }); break;
         case 'hit': if(!gate('hit',45)) return; tone(t,'sine',240+Math.random()*80,80,0.05,0.05); break;
         case 'kill': if(!gate('kill',55)) return; noise(t,0.09,0.1,'lowpass',900); tone(t,'sawtooth',160,30,0.08,0.06); break;
         case 'explosion': if(!gate('explosion',90)) return; noise(t,0.45,0.28,'lowpass',700); tone(t,'sawtooth',100,22,0.4,0.16); break;
@@ -382,7 +384,7 @@ const ZDEF={
 };
 const CHAR_DEF={
   leader:{scale:1.1}, soldier:{scale:1.04}, normal:{scale:1.06}, runner:{scale:1.0},
-  tank:{scale:1.38}, spitter:{scale:1.1}, boss:{scale:3.3}
+  tank:{scale:1.38}, spitter:{scale:1.1}, boss:{scale:3.3}, jugg:{scale:2.8}, queen:{scale:3.1}, crawler:{scale:1.35}
 };
 const CRATE_DEF={
   rate:{label:'RATE UP', icon:'⚡', color:'#38bdf8', hex:0x38bdf8},
@@ -1084,7 +1086,9 @@ const DESIGNS={
   runner:{sp:SP_RUN,T:0.034,v:2,fn:designRunner},
   tank:{sp:SP_TANK,T:0.03,v:1,fn:designTank},
   spitter:{sp:SP_STD,T:0.034,v:1,fn:designSpitter},
-  boss:{sp:SP_BOSS,T:0.018,v:1,fn:designBoss}
+  boss:{sp:SP_BOSS,T:0.018,v:1,fn:designBoss},
+  jugg:{sp:SP_BOSS,T:0.018,v:1,fn:designBoss},
+  queen:{sp:SP_BOSS,T:0.018,v:1,fn:designBoss}
 };
 const CHAR_GEO={};
 function charGeo(kind,v){
@@ -1130,8 +1134,8 @@ const MODEL_SRC={
   zombieD:{files:['models/zombie_d.glb','https://static.poly.pizza/972d277d-6fc4-46c7-85d1-e4d68cf46548.glb'],h:1.85},
   rifle:{files:['models/rifle.glb','https://static.poly.pizza/55ae5e9a-5e18-41b7-a352-dbcfc3c60854.glb'],rifle:true}
 };
-const KIND_MODEL={leader:['soldier'],soldier:['soldier'],normal:['zombieA','zombieD','zombieB'],runner:['zombieB','zombieA','zombieD'],tank:['zombieC','zombieA'],spitter:['zombieD','zombieA'],boss:['zombieC','zombieA']};
-const KIND_TINT={spitter:0xa6e070,boss:0xa65a55,tank:0xc0b8d0};
+const KIND_MODEL={jugg:['zombieC','zombieA'],queen:['zombieD','zombieA'],leader:['soldier'],soldier:['soldier'],normal:['zombieA','zombieD','zombieB'],runner:['zombieB','zombieA','zombieD'],tank:['zombieC','zombieA'],spitter:['zombieD','zombieA'],boss:['zombieC','zombieA']};
+const KIND_TINT={spitter:0xa6e070,boss:0xa65a55,tank:0xc0b8d0,jugg:0x7d8590,queen:0xc08ae0};
 const GLB={};
 const GRADE_SOLDIER=new THREE.Color(0x4f5a45), GRADE_ZOMBIE=new THREE.Color(0x6a6f58);
 let rifleProto=null;
@@ -1224,7 +1228,7 @@ function buildGLBChar(kind,key){
   root.scale.setScalar(CHAR_DEF[kind].scale); scene.add(root);
   const c={kind,root,mixer,act,deathAct,mats,rifle,handR,muzzle,core,glb:true,phase:Math.random()*6.28,hit:0,gripped:false,gunModel,wpn:curWeapon};
   if(rifle&&handR) gripRifle(c,inner);
-  if(kind==='boss') decorateBoss(c,inner);
+  if(kind==='boss'||kind==='jugg'||kind==='queen') decorateBoss(c,inner,kind);
   if(c.core) c.coreBase=c.core.scale.x;
   return c;
 }
@@ -1247,7 +1251,8 @@ function gripRifle(c,inner){
   }catch(e){}
 }
 // ボス：骨に鎧・トゲ・角・光るコアを取り付け、アニメーションに追従させる
-function decorateBoss(c,inner){
+function decorateBoss(c,inner,style){
+  style=style||'boss';
   try{
     const root=c.root; root.updateMatrixWorld(true);
     const loc=(b)=>{ const v=new THREE.Vector3(); b.getWorldPosition(v); return root.worldToLocal(v); };
@@ -1257,8 +1262,26 @@ function decorateBoss(c,inner){
     const cp=chest?loc(chest):new THREE.Vector3(0,1.2,0);
     const shL=findBone(inner,/(shoulder|upperarm|arm).*(\.l$|_l$|left)|left.*(shoulder|arm)/i), shR=findBone(inner,/(shoulder|upperarm|arm).*(\.r$|_r$|right)|right.*(shoulder|arm)/i);
     const boneMat=new THREE.MeshStandardMaterial({color:0xd9ceb4,roughness:0.6}), armor=new THREE.MeshStandardMaterial({color:0x22252b,roughness:0.45,metalness:0.6});
-    const glow=new THREE.MeshBasicMaterial({color:0xff2a2a});
+    const glow=new THREE.MeshBasicMaterial({color:style==='queen'?0xd946ef:0xff2a2a});
     const put=(bone,mesh,x,y,z,rx,ry,rz)=>{ mesh.position.set(x,y,z); mesh.rotation.set(rx||0,ry||0,rz||0); mesh.castShadow=true; root.add(mesh); mesh.updateMatrixWorld(true); if(bone) bone.attach(mesh); return mesh; };
+    if(style==='jugg'){
+      for(const [bone,sd] of [[shL,-1],[shR,1]]){ const sp=bone?loc(bone):new THREE.Vector3(sd*0.2,1.45,0); put(bone,new THREE.Mesh(rb(0.46,0.22,0.5,0.06),armor),sp.x+sd*0.08,sp.y+0.1,sp.z,0,0,-sd*0.25); put(bone,new THREE.Mesh(rb(0.2,0.3,0.44,0.05),armor),sp.x+sd*0.2,sp.y-0.12,sp.z); }
+      put(chest,new THREE.Mesh(rb(0.52,0.48,0.14,0.05),armor),0,cp.y,cp.z-0.2); put(chest,new THREE.Mesh(rb(0.5,0.5,0.12,0.05),armor),0,cp.y,cp.z+0.2);
+      put(head,new THREE.Mesh(rb(0.36,0.3,0.34,0.08),armor),hp.x,hp.y+0.14,hp.z);
+      put(head,new THREE.Mesh(rb(0.26,0.035,0.02,0.01),new THREE.MeshBasicMaterial({color:0xffa31a})),hp.x,hp.y+0.14,hp.z-0.18);
+      for(const m of c.mats){ if(m.emissive){ m.userData.baseE=new THREE.Color(0x000000); } }
+      return;
+    }
+    if(style==='queen'){
+      for(let k=0;k<5;k++){ const a=(k-2)*0.35; put(head,new THREE.Mesh(cone(0.04,0.3),boneMat),hp.x+Math.sin(a)*0.12,hp.y+0.3,hp.z+Math.cos(a)*0.02,0,0,-a*0.8); }
+      for(const q of [[-0.14,0.1],[0.14,0.1],[0,-0.08]]){ const m=put(chest,new THREE.Mesh(R.sphere,glow),q[0],cp.y+q[1],cp.z+0.26); m.scale.multiplyScalar(0.11); }
+      const core=put(chest,new THREE.Mesh(R.sphere,glow),0,cp.y+0.05,cp.z-0.22); core.scale.multiplyScalar(0.07);
+      const aura=new THREE.Sprite(new THREE.SpriteMaterial({map:R.softTex,color:0xd946ef,transparent:true,opacity:0.3,depthWrite:false,blending:THREE.AdditiveBlending}));
+      aura.scale.set(1.5,1.5,1); aura.position.set(0,cp.y,cp.z); c.root.add(aura);
+      c.core=core; c.aura=aura;
+      for(const m of c.mats){ if(m.emissive){ m.userData.baseE=new THREE.Color(0x1a0420); m.emissive.copy(m.userData.baseE); } }
+      return;
+    }
     for(const [bone,sd] of [[shL,-1],[shR,1]]){
       const sp=bone?loc(bone):new THREE.Vector3(sd*0.2,1.45,0);
       put(bone,new THREE.Mesh(rb(0.34,0.14,0.4,0.05),armor),sp.x+sd*0.06,sp.y+0.1,sp.z,0,0,-sd*0.3);
@@ -1285,6 +1308,7 @@ function placeRifle(c){
   }
 }
 function buildCharacter(kind){
+  if(kind==='crawler') return buildCrawler();
   const key=modelKeyFor(kind);
   const c=key?buildGLBChar(kind,key):buildToonChar(kind);
   if(kind==='leader'){ const ring=new THREE.Mesh(R.ringFx,new THREE.MeshBasicMaterial({color:0x38bdf8,transparent:true,opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide})); ring.scale.set(0.7,1,0.7); ring.position.y=0.05; c.root.add(ring); }
@@ -1299,7 +1323,7 @@ function getChar(kind){
   c.hit=0; setCharFlash(c,0); return c;
 }
 function releaseChar(c){ c.root.visible=false; (charPool[c.kind]||(charPool[c.kind]=[])).push(c); }
-function setCharFlash(c,v){ for(const m of c.mats){ if(!m.emissive) continue; const b=m.userData.baseE; if(b) m.emissive.setRGB(b.r+v,b.g+v*0.9,b.b+v*0.8); else m.emissive.setRGB(v,v*0.9,v*0.8); } }
+function setCharFlash(c,v){ for(const m of c.mats){ if(!m.emissive) continue; const b=m.userData.baseE; const r=v*0.32, g=v*0.08, bl=v*0.05; if(b) m.emissive.setRGB(b.r+r,b.g+g,b.b+bl); else m.emissive.setRGB(r,g,bl); } }
 const kneeBend=(ph,amt)=>-Math.max(0,Math.sin(ph))*amt;
 function animSoldier(c,dt,recoil){
   const B=c.B, sp=c.sp; c.phase+=dt*10.5; const ph=c.phase, s=Math.sin(ph);
@@ -1392,21 +1416,21 @@ function hurtSquad(n){
 }
 function spawnBullet(x,y,z,vx,dmg,pen,exp){
   const b=bulletPool.pop()||{hits:[]};
-  b.x=x;b.y=y;b.z=z;b.oz=z;b.minZ=z-bulletRange();b.vx=vx;b.vz=-BULLET_SPEED;b.dmg=dmg;b.pen=pen;b.exp=exp;b.amp=false;b.snip=false;b.splash=2.5;b.blast=1.5;b.hits.length=0;
+  b.x=x;b.y=y;b.z=z;b.oz=z;b.minZ=z-bulletRange();b.vx=vx;b.vz=-BULLET_SPEED;b.dmg=dmg;b.pen=pen;b.exp=exp;b.amp=false;b.snip=false;b.cluster=false;b.splash=2.5;b.blast=1.5;b.hits.length=0;
   bullets.push(b); return b;
 }
 const _mv=new THREE.Vector3();
 function fire(m){
   const r=m.c.root, sc=r.scale.x; let mx=r.position.x+0.1*sc, my=1.38*sc, mz=r.position.z-1.1*sc;
   if(m.c.muzzle){ m.c.muzzle.getWorldPosition(_mv); if(isFinite(_mv.x)&&Math.abs(_mv.x-r.position.x)<1.5&&_mv.y>0.3&&_mv.y<2.4){ mx=_mv.x; my=_mv.y; mz=Math.min(_mv.z,r.position.z-0.3); } }
-  const Wp=WEAPONS[curWeapon], exp=Wp.exp||up.explosive;
+  const Wp=curW(), exp=Wp.exp||up.explosive;
   const dmg=Wp.dmg*(up.explosive&&!Wp.exp?1.8:1)*dmgMul(), pen=1+up.pen+Wp.pen;
-  const splash=(Wp.exp?Wp.dmg*0.9:2.5)*dmgMul(), blast=Wp.exp?Wp.blast*(1+0.2*up.blast):blastR(), range=Wp.range+8*up.range;
+  const splash=(Wp.exp?Wp.dmg*Wp.splashMul:2.5)*dmgMul(), blast=Wp.exp?Wp.blast*(1+0.2*up.blast):blastR(), range=Wp.range+8*up.range;
   for(const sp of SPREADS[up.spread-1]){
     for(let k=0;k<Wp.pellets;k++){
       const slope=(Wp.pellets>1?lerp(-Wp.spread,Wp.spread,k/(Wp.pellets-1)):0)+sp[1];
       const b=spawnBullet(mx+sp[0],my,mz,slope*Wp.speed+rand(-Wp.jitter,Wp.jitter),dmg,pen,exp);
-      b.vz=-Wp.speed; b.minZ=mz-range; b.splash=splash; b.blast=blast; b.snip=(curWeapon==='sniper');
+      b.vz=-Wp.speed; b.minZ=mz-range; b.splash=splash; b.blast=blast; b.snip=(curWeapon==='sniper'||Wp.tracer==='amp'); b.cluster=Wp.cluster;
     }
   }
   m.recoil=curWeapon==='shotgun'||curWeapon==='sniper'||curWeapon==='launcher'?1.6:1;
@@ -1475,19 +1499,20 @@ function updateSpawning(dt){
     spawnWave();
     let iv=Math.max(0.3,1.0*Math.pow(SPAWN_ACCEL,diff()));
     if(boss) iv*=1.5;
+    if(hordeState===2) iv/=3;
     spawnTimer=iv;
   }
   if(!boss){ gateTimer-=dt; if(gateTimer<=0&&gates.length===0){ spawnGatePair(); gateTimer=10; } }
   crateTimer-=dt; if(crateTimer<=0&&crates.length===0){ spawnCrate(); crateTimer=13; }
   if(stage>=3){ carTimer-=dt; if(carTimer<=0){ spawnCar(); carTimer=rand(8,11)*Math.pow(0.95,diff()-2); } }
-  if(!boss&&!bossSpawned&&(stageTime>42||stageKills>=75+15*(stage-1))) spawnBoss();
+  if(!boss&&!bossSpawned&&hordeState===0&&(stageTime>42||stageKills>=75+15*(stage-1))) spawnBoss();
 }
 function damageZombie(z,d,crit,showNum){
   if(z.dead) return;
   z.hp-=d; z.flash=1; z.c.hit=1; z.kb=Math.min(z.kb+z.kbMul,z.speed*0.45);
   Sound.play('hit');
   const p=z.c.root.position;
-  if(sparkBudget>0){ sparkBudget--; const hy=1.2*z.c.root.scale.x/1.15; P.fire.spawn(p.x+rand(-.2,.2),hy,p.z+0.4,rand(-2,2),rand(1,3),rand(1,3),0.1,0.1,0xffffff,1.5); const m=P.mist.spawn(p.x+rand(-.2,.2),hy,p.z+0.3,rand(-1,1),rand(0,1),rand(0.5,2),0.35,0.16,0x8b0a0a,2); m.a0=0.7; }
+  if(sparkBudget>0){ sparkBudget--; const hy=1.2*z.c.root.scale.x/1.15; P.fire.spawn(p.x+rand(-.2,.2),hy,p.z+0.4,rand(-2,2),rand(1,3),rand(1,3),0.08,0.05,0x996633,1.2); if(Math.random()<0.3){ const m=P.mist.spawn(p.x+rand(-.2,.2),hy,p.z+0.3,rand(-1,1),rand(0,1),rand(0.5,2),0.3,0.12,0x6b0808,1.8); m.a0=0.45; } }
   if(Math.random()<0.3) P.debris.spawn(p.x,1,p.z,rand(-2,2),rand(2,5),rand(-1,2),0.7,rand(0.04,0.08),0x4a6b4f);
   if(showNum) dmgNumber(d,p.x,1.8,p.z,crit);
   if(z.hp<=0) killZombie(z);
@@ -1554,6 +1579,14 @@ function updateBullets(dt){
         const c=cars[ci]; if(c.dead) continue; const cz=c.g.position.z;
         if(b.z<=cz+1.6&&b.oz>=cz-1.6&&Math.abs(b.x-c.x)<=1.0){ damageCar(c,b.dmg); dead=true; break; }
       }
+      if(!dead) for(let oi=0;oi<barrels.length;oi++){
+        const o=barrels[oi]; if(o.dead||o.fuse>0) continue;
+        if(b.z<=o.z+o.hd&&b.oz>=o.z-o.hd&&Math.abs(b.x-o.x)<=o.hw){ damageProp(o,b.dmg); dead=true; break; }
+      }
+      if(!dead&&boss&&boss.shield&&!boss.shield.broken){
+        const g=boss.shield.g.position;
+        if(b.z<=g.z+0.4&&b.oz>=g.z-0.4&&Math.abs(b.x-g.x)<=1.9){ damageShield(b.dmg); dead=true; }
+      }
       if(!dead) for(let j=0;j<zombies.length;j++){
         const z=zombies[j]; if(z.dead) continue;
         const p=z.c.root.position, r=z.r;
@@ -1562,13 +1595,13 @@ function updateBullets(dt){
           b.hits.push(z.id);
           const crit=Math.random()<critChance();
           damageZombie(z,b.dmg*(crit?2:1),crit,true);
-          if(b.exp) explode(p.x,p.z,b.blast,b.splash,z,false);
+          if(b.exp){ explode(p.x,p.z,b.blast,b.splash,z,false); if(b.cluster) for(let k=0;k<3;k++) explode(p.x+rand(-1.8,1.8),p.z+rand(-1.8,1.8),b.blast*0.6,b.splash*0.5,null,false); }
           if(--b.pen<=0){ dead=true; break; }
         }
       }
       if(!dead&&boss&&!boss.dead){
         const p=boss.c.root.position;
-        if(b.z<=p.z+2.2&&b.oz>=p.z-2.2&&Math.abs(b.x-p.x)<=2.2&&b.hits.indexOf(-1)===-1){
+        if(p.y<3&&b.z<=p.z+2.2&&b.oz>=p.z-2.2&&Math.abs(b.x-p.x)<=2.2&&b.hits.indexOf(-1)===-1){
           b.hits.push(-1);
           const crit=Math.random()<critChance();
           damageBoss(b.dmg*(crit?2:1),crit,b.x,p.z);
@@ -1592,11 +1625,11 @@ function bloodBurst(x,y,z,n,big){
 }
 function explosionFx(x,z,scale){
   if(fxBudget<=0&&scale<2) return; fxBudget--;
-  const n=Math.round(8*scale);
-  P.glow.spawn(x,1.0,z,0,0,0,0.18,2.2*scale,0xffc070,1.4);
+  const small=scale<2, n=Math.round((small?3:8)*scale);
+  if(!small) P.glow.spawn(x,1.0,z,0,0,0,0.18,2.2*scale,0xffc070,1.4);
   for(let i=0;i<n;i++) P.fire.spawn(x+rand(-.4,.4)*scale,0.5+Math.random()*0.6,z+rand(-.4,.4)*scale,rand(-3,3)*scale,rand(2,6)*scale,rand(-3,3)*scale,rand(0.3,0.55),rand(0.35,0.6)*scale,0xffffff,2.0);
-  for(let i=0;i<Math.round(6*scale);i++) P.fire.spawn(x,0.6,z,rand(-9,9),rand(4,12),rand(-9,9),rand(0.2,0.4),0.05,0xffffff,1);
-  for(let i=0;i<Math.round(4*scale);i++){ const m=P.smoke.spawn(x+rand(-.6,.6),0.9,z+rand(-.6,.6),rand(-1,1),rand(1.5,3.5),rand(-1,1),rand(1.4,2.4),rand(0.45,0.8)*scale,Math.random()<0.5?0x3f3f46:0x57534e,2.6); m.a0=0.75; }
+  for(let i=0;i<Math.round((small?2:6)*scale);i++) P.fire.spawn(x,0.6,z,rand(-9,9),rand(4,12),rand(-9,9),rand(0.2,0.4),0.05,0xffffff,1);
+  for(let i=0;i<Math.round((small?1.5:4)*scale);i++){ const m=P.smoke.spawn(x+rand(-.6,.6),0.9,z+rand(-.6,.6),rand(-1,1),rand(1.5,3.5),rand(-1,1),rand(1.4,2.4),rand(0.45,0.8)*scale,Math.random()<0.5?0x3f3f46:0x57534e,2.6); m.a0=0.75; }
   for(let i=0;i<Math.round(5*scale);i++) P.debris.spawn(x,0.4,z,rand(-5,5),rand(4,9),rand(-5,5),rand(0.8,1.2),rand(0.06,0.12),0x292524);
   spawnRing(x,z,2.6*scale,0xf97316);
   const dd=P.decal.spawnFlat(x,z,0.9*scale,0x141210,20); dd.a0=0.85;
@@ -1613,53 +1646,257 @@ function explode(x,z,r,dmg,except,big){
   }
   if(boss&&!boss.dead){
     const p=boss.c.root.position, dx=p.x-x, dz=p.z-z, rr=r+2;
-    if(dx*dx+dz*dz<rr*rr) damageBoss(dmg*(big?1.6:0.25),big,x,p.z);
+    if(boss.shield&&!boss.shield.broken){ const g=boss.shield.g.position; if(Math.hypot(g.x-x,g.z-z)<r+1.5) damageShield(dmg*(big?1.2:0.25)); }
+    else if(dx*dx+dz*dz<rr*rr&&p.y<3) damageBoss(dmg*(big?1.6:0.25),big,x,p.z);
   }
+  for(const o of barrels){ if(!o.dead&&o.fuse<=0&&Math.hypot(o.x-x,o.z-z)<r+o.hw) o.fuse=0.15; }
 }
 
 // ================= ボス =================
+// ================= 撃てる仕掛け（ドラム缶・タンクローリー） =================
+const barrels=[], fireZones=[];
+let barrelTimer=3, tankerTimer=40, barrelHintShown=false;
+const PROP_GEO={};
+function barrelGeo(){
+  if(PROP_GEO.barrel) return PROP_GEO.barrel;
+  const b=new CharBuilder(0.001);
+  b.add(cyl(0.36,0.36,1.0),0,0xb91c1c,[0,0.5,0]);
+  for(const y of [0.2,0.5,0.8]) b.add(cyl(0.37,0.37,0.05),0,0x5b0f0f,[0,y,0]);
+  b.add(cyl(0.3,0.3,0.03),0,0x7f1d1d,[0,1.0,0]);
+  b.add(rb(0.3,0.26,0.03,0.01),0,0xfacc15,[0,0.62,-0.36]);
+  b.add(cone(0.07,0.12),0,0xff5a1f,[0,0.62,-0.38],[-Math.PI/2,0,0],null,true);
+  return PROP_GEO.barrel=b.build().geo;
+}
+function tankerGeo(){
+  if(PROP_GEO.tanker) return PROP_GEO.tanker;
+  const b=new CharBuilder(0.001), rot=[Math.PI/2,0,0];
+  b.add(rb(2.2,1.6,1.9,0.25),0,0xe4e4e0,[0,1.35,-2.6]); b.add(rb(2.1,0.7,0.1,0.08),0,0x1b2027,[0,1.75,-3.56]);
+  b.add(rb(2.3,0.35,6.8,0.1),0,0x2b2e33,[0,0.55,0]);
+  b.add(cyl(1.05,1.05,4.8),0,0xc8ccd0,[0,1.75,0.85],rot);
+  b.add(cyl(1.07,1.07,0.5),0,0xf97316,[0,1.75,0.85],rot);
+  for(const z of [-1.2,3.0]) b.add(cyl(1.06,1.06,0.12),0,0x8a8f96,[0,1.75,z],rot);
+  b.add(rb(0.9,0.9,0.05,0.05),0,0xfacc15,[1.07,1.75,0.85],[0,Math.PI/2,0]);
+  b.add(rb(0.5,0.5,0.06,0.05),0,0xff3b1f,[1.1,1.75,0.85],[0,Math.PI/2,Math.PI/4],null,true);
+  for(const q of [[1,-2.6],[-1,-2.6],[1,1.2],[-1,1.2],[1,2.6],[-1,2.6]]) b.add(cyl(0.45,0.45,0.35),0,0x151515,[q[0]*1.05,0.45,q[1]],[0,0,Math.PI/2]);
+  return PROP_GEO.tanker=b.build().geo;
+}
+function spawnBarrel(){
+  let x=0,z=0;
+  for(let tries=0;tries<10;tries++){ x=rand(-3.8,3.8); z=rand(-32,-15); if(barrels.every(o=>o.dead||Math.hypot(o.x-x,o.z-z)>3)) break; }
+  const m=new THREE.Mesh(barrelGeo(),[R.gunVC,R.glowMat]); m.position.set(x,0,z); m.rotation.y=rand(0,6.28); m.castShadow=true; m.scale.setScalar(0.01); scene.add(m);
+  barrels.push({m,x,z,hp:6,hw:0.5,hd:0.5,tanker:false,dead:false,fuse:0,pop:0});
+  if(!barrelHintShown){ barrelHintShown=true; showBanner('🛢 赤いドラム缶を撃つと大爆発！','linear-gradient(90deg,#991b1b,#f97316)'); }
+}
+function spawnTanker(){
+  const x=rand(-1.8,1.8), z=rand(-34,-28);
+  const m=new THREE.Mesh(tankerGeo(),[R.gunVC,R.glowMat]); m.position.set(x,0,z); m.rotation.y=Math.PI+rand(-0.15,0.15); m.castShadow=true; m.scale.setScalar(0.01); scene.add(m);
+  barrels.push({m,x,z,hp:45,hw:1.25,hd:3.4,tanker:true,dead:false,fuse:0,pop:0});
+  showBanner('⛽ 燃料タンクローリー出現！ 撃てば超大爆発','linear-gradient(90deg,#9a3412,#fbbf24)');
+}
+function damageProp(o,d){
+  if(o.dead||o.fuse>0) return; o.hp-=d;
+  if(sparkBudget>0){ sparkBudget--; P.fire.spawn(o.x+rand(-.3,.3),0.8,o.z+o.hd,rand(-2,2),rand(1,3),rand(1,3),0.1,0.07,0xffffff,1.3); }
+  if(o.hp<=0) o.fuse=0.01;
+}
+function detonateProp(o){
+  o.dead=true; scene.remove(o.m); fxBudget=Math.max(fxBudget,2);
+  if(o.tanker){
+    for(let k=0;k<4;k++) explosionFx(o.x+rand(-1.5,1.5),o.z+rand(-3,3),2);
+    explode(o.x,o.z,6.5,60*hpMul(),null,true);
+    fireZones.push({x:o.x,z:o.z,r:3.6,t:7});
+    anim(E['flash'],[{opacity:0.35},{opacity:0}],{duration:400,easing:'ease-out'});
+    shake=Math.max(shake,1.3);
+    pts+=300*stage;
+  }else{
+    explode(o.x,o.z,3.4,22*hpMul(),null,true);
+    pts+=60*stage;
+  }
+}
+function updateProps(dt){
+  if(clearTimer<=0&&gameOverT<=0){
+    const alive=barrels.filter(o=>!o.dead&&!o.tanker).length, maxB=Math.min(3,1+Math.floor(stage/2));
+    barrelTimer-=dt; if(barrelTimer<=0){ barrelTimer=rand(6,10); if(alive<maxB) spawnBarrel(); }
+    if(stage>=2){ tankerTimer-=dt; if(tankerTimer<=0){ tankerTimer=rand(45,60); if(!barrels.some(o=>o.tanker&&!o.dead)) spawnTanker(); } }
+  }
+  for(let i=barrels.length-1;i>=0;i--){
+    const o=barrels[i];
+    if(o.dead){ barrels.splice(i,1); continue; }
+    if(o.pop<1){ o.pop=Math.min(1,o.pop+dt*4); o.m.scale.setScalar(easeOut(o.pop)); }
+    if(o.fuse>0){ o.fuse-=dt; if(o.fuse<=0) detonateProp(o); }
+  }
+  for(let i=fireZones.length-1;i>=0;i--){
+    const f=fireZones[i]; f.t-=dt;
+    if(f.t<=0){ fireZones.splice(i,1); continue; }
+    if(Math.random()<dt*30){ const a=Math.random()*6.28, r=Math.random()*f.r; P.fire.spawn(f.x+Math.cos(a)*r,0.3,f.z+Math.sin(a)*r,0,rand(1.5,3),0,rand(0.4,0.7),rand(0.3,0.55),0xffffff,1.8); }
+    if(Math.random()<dt*4){ const s=P.smoke.spawn(f.x+rand(-f.r,f.r)*0.6,1.5,f.z+rand(-f.r,f.r)*0.6,rand(-0.3,0.3),rand(2,3),0,3,0.9,0x2a2a2e,2.5); s.a0=0.5; }
+    const dps=9*hpMul(), r2=f.r*f.r;
+    for(const z of zombies){ if(z.dead) continue; const p=z.c.root.position, dx=p.x-f.x, dz=p.z-f.z; if(dx*dx+dz*dz<r2){ z.hp-=dps*dt; if(z.hp<=0) killZombie(z); } }
+  }
+}
+function clearProps(){ barrels.forEach(o=>scene.remove(o.m)); barrels.length=0; fireZones.length=0; }
+
+// ================= ボスの種類 =================
+const BOSS_TYPES={
+  goliath:{kind:'boss',name:'MUTANT GOLIATH',hpMul:1.0,warn:'⚠ WARNING : BOSS APPROACHING ⚠'},
+  juggernaut:{kind:'jugg',name:'JUGGERNAUT',hpMul:1.0,warn:'⚠ 装甲巨人：盾の横から撃て！ ⚠'},
+  crawler:{kind:'crawler',name:'CABLE CRAWLER',hpMul:0.85,warn:'⚠ ケーブルから巨大グモが降下！ ⚠'},
+  queen:{kind:'queen',name:'BROOD QUEEN',hpMul:1.2,warn:'⚠ 女王：手下を呼び続ける！ ⚠'}
+};
+const BOSS_ORDER=['goliath','juggernaut','crawler','queen'];
+function segMesh(a,b,r,mat){
+  const d=new THREE.Vector3().subVectors(b,a), L=d.length();
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(r*0.7,r,L,7),mat);
+  m.position.copy(a).addScaledVector(d,0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize()); m.castShadow=true; return m;
+}
+function buildCrawler(){
+  const root=new THREE.Group(), body=new THREE.Group(); root.add(body);
+  const skin=new THREE.MeshStandardMaterial({color:0x3d2b2b,roughness:0.6}), bone=new THREE.MeshStandardMaterial({color:0xd9ceb4,roughness:0.6}), glow=new THREE.MeshBasicMaterial({color:0xff3030}), sac=new THREE.MeshBasicMaterial({color:0xff5a2a});
+  const add=(geo,mat,p,s,r)=>{ const m=new THREE.Mesh(geo,mat); m.position.set(p[0],p[1],p[2]); if(s) m.scale.set(s[0],s[1],s[2]); if(r) m.rotation.set(r[0],r[1],r[2]); m.castShadow=true; body.add(m); return m; };
+  add(R.sphere,skin,[0,1.35,0.95],[1.15,0.85,1.5]);
+  add(R.sphere,skin,[0,1.2,-0.35],[0.75,0.55,0.8]);
+  add(rb(0.62,0.46,0.55,0.15),skin,[0,1.2,-1.05]);
+  for(const q of [[-0.14,1.3],[0.14,1.3],[-0.24,1.2],[0.24,1.2]]) add(R.sphere,glow,[q[0],q[1],-1.33],[0.06,0.06,0.06]);
+  for(const s of [-1,1]) add(cone(0.06,0.4),bone,[s*0.15,1.02,-1.35],[-2.2,0,s*0.3]);
+  for(let k=0;k<5;k++) add(cone(0.1,0.5),bone,[0,2.05-k*0.05,0.4+k*0.35],[0.5,0,0]);
+  const core=add(R.sphere,sac,[0,1.45,1.95],[0.3,0.3,0.3]);
+  const legs=[];
+  for(let i=0;i<8;i++){
+    const s=i<4?-1:1, zi=-0.75+(i%4)*0.45;
+    const hip=new THREE.Group(); hip.position.set(s*0.45,1.2,zi); body.add(hip);
+    const kneeP=new THREE.Vector3(s*1.2,0.8,zi*0.3), footP=new THREE.Vector3(s*2.1,-1.2,zi*0.6);
+    hip.add(segMesh(new THREE.Vector3(0,0,0),kneeP,0.1,skin));
+    const knee=new THREE.Group(); knee.position.copy(kneeP); hip.add(knee);
+    knee.add(segMesh(new THREE.Vector3(0,0,0),footP.clone().sub(kneeP),0.08,bone));
+    legs.push({hip,s,ph:(i%2)*Math.PI+(i%4)*0.5});
+  }
+  root.scale.setScalar(CHAR_DEF.crawler.scale); scene.add(root);
+  return {kind:'crawler',root,body,mats:[skin],legs,core,coreBase:0.3,custom:true,phase:0,hit:0};
+}
+function animCrawler(c,dt,speed){
+  c.phase+=dt*(4+speed*1.5);
+  for(const l of c.legs){ const s=Math.sin(c.phase+l.ph); l.hip.rotation.y=s*0.35*l.s; l.hip.rotation.z=Math.max(0,Math.cos(c.phase+l.ph))*0.25*l.s; }
+  c.body.position.y=Math.abs(Math.sin(c.phase*2))*0.08;
+  c.body.rotation.x=(c.hit||0)*0.25; if(c.hit>0) c.hit=Math.max(0,c.hit-dt*5);
+}
+function makeShield(){
+  const b=new CharBuilder(0.001);
+  b.add(rb(3.8,2.4,0.5,0.12),0,0x6b3b22,[0,1.4,0]);
+  b.add(rb(3.2,0.8,0.1,0.06),0,0x121418,[0,1.95,-0.26]);
+  for(const x of [-1.4,-0.5,0.5,1.4]) b.add(rb(0.12,2.2,0.2,0.04),0,0x3a3f46,[x,1.35,-0.3]);
+  for(const x of [-1.5,-0.75,0,0.75,1.5]) b.add(cone(0.1,0.5),0,0x9aa3ad,[x,0.7,-0.45],[-Math.PI/2,0,0]);
+  b.add(rb(3.9,0.25,0.55,0.08),0,0x2b2e33,[0,0.25,0]);
+  const g=new THREE.Mesh(b.build().geo,[R.gunVC,R.glowMat]); g.castShadow=true; scene.add(g); return g;
+}
+
+// ================= 大群襲来イベント =================
+let hordeState=0, hordeT=0, hordeDone=false;
+function updateHorde(dt){
+  if(clearTimer>0||gameOverT>0) return;
+  if(hordeState===0&&!hordeDone&&!boss&&stageTime>(stage===1?26:20)){
+    hordeState=1; hordeT=3; Sound.play('siren');
+    showStageBanner('⚠ 大群接近 ⚠','10秒間耐えきれ！');
+  }else if(hordeState===1){
+    hordeT-=dt; if(hordeT<=0){ hordeState=2; hordeT=10; spawnTimer=0; }
+  }else if(hordeState===2){
+    hordeT-=dt;
+    if(hordeT<=0){
+      hordeState=0; hordeDone=true;
+      const bonus=400*stage; pts+=bonus; chargeUlt(20);
+      showBanner('🛡 大群撃退！ +'+bonus.toLocaleString()+' pts','linear-gradient(90deg,#15803d,#4ade80)');
+      Sound.play('clear');
+    }
+  }
+}
+
 function spawnBoss(){
   bossSpawned=true;
-  const c=getChar('boss'); c.root.position.set(0,0,-58);
-  const hp=Math.round(700*Math.pow(BOSS_GROWTH,stage-1));
-  boss={c,hp,maxHp:hp,kb:0,flash:0,summon:4,rock:3,volley:0,volleyT:0,enraged:false,dead:false,stompT:0,t:0};
+  const type=BOSS_ORDER[(stage-1)%BOSS_ORDER.length], T=BOSS_TYPES[type];
+  const c=getChar(T.kind); c.root.position.set(0,0,-58);
+  const hp=Math.round(700*Math.pow(BOSS_GROWTH,stage-1)*T.hpMul);
+  boss={type,name:T.name,c,hp,maxHp:hp,kb:0,flash:0,summon:4,enraged:false,dead:false,stompT:0,t:0,stun:0,chargeT:6,tele:0,charging:0,tx:0,retarget:0,phase:'walk',shield:null};
+  if(type==='juggernaut'){ const hpS=Math.round(hp*0.3); boss.shield={g:makeShield(),hp:hpS,maxHp:hpS,broken:false}; }
+  if(type==='crawler'){ const sd=Math.random()<0.5?-1:1; c.root.position.set(sd*6.8,14,-26); boss.phase='drop'; boss.dropT=0; boss.dropX=sd*6.8; }
   E['boss-hud'].classList.add('show'); E['boss-hud'].classList.remove('enraged');
-  setText('boss-label','⚠ STAGE '+stage+' BOSS : MUTANT GOLIATH ⚠');
+  setText('boss-label','⚠ STAGE '+stage+' BOSS : '+T.name+' ⚠');
   E['boss-bar'].style.width='100%';
   Sound.play('roar'); Sound.setIntensity(1); shake=Math.max(shake,1);
-  showBanner('⚠ WARNING : BOSS APPROACHING ⚠','linear-gradient(90deg,#991b1b,#ef4444)');
+  showBanner(T.warn,'linear-gradient(90deg,#991b1b,#ef4444)');
 }
 function damageBoss(d,crit,x,z){
   if(!boss||boss.dead) return;
-  boss.hp-=d; boss.flash=1; boss.c.hit=Math.max(boss.c.hit,0.4); bossHpDirty=true; chargeUlt(d*0.04);
+  boss.hp-=d; boss.flash=Math.min(1,boss.flash+0.25); boss.c.hit=Math.max(boss.c.hit||0,0.4); bossHpDirty=true; chargeUlt(d*0.04);
   Sound.play('hit');
   if(Math.random()<0.4||crit) dmgNumber(d,x,3.4,z+1,crit);
   if(!boss.enraged&&boss.hp<boss.maxHp*0.5){
     boss.enraged=true; Sound.play('roar'); shake=Math.max(shake,1);
-    E['boss-hud'].classList.add('enraged'); setText('boss-label','🔥 GOLIATH ENRAGED 🔥');
+    E['boss-hud'].classList.add('enraged'); setText('boss-label','🔥 '+boss.name+' ENRAGED 🔥');
   }
   if(boss.hp<=0) boss.dead=true;
 }
+function damageShield(d){
+  const sh=boss&&boss.shield; if(!sh||sh.broken) return;
+  sh.hp-=d; Sound.play('hit');
+  if(sparkBudget>0){ sparkBudget--; P.fire.spawn(sh.g.position.x+rand(-1.5,1.5),rand(0.5,2.2),sh.g.position.z-0.4,rand(-2,2),rand(1,3),rand(-3,-1),0.12,0.07,0xffffff,1.3); }
+  if(sh.hp<=0){
+    sh.broken=true; scene.remove(sh.g); boss.stun=2.5; fxBudget=Math.max(fxBudget,3);
+    for(let k=0;k<3;k++) explosionFx(sh.g.position.x+rand(-1.5,1.5),sh.g.position.z,2);
+    Sound.play('bigboom'); shake=Math.max(shake,1);
+    showBanner('💥 シールド破壊！ 今がチャンス','linear-gradient(90deg,#b45309,#facc15)');
+  }
+}
+function removeShield(){ if(boss&&boss.shield&&!boss.shield.broken) scene.remove(boss.shield.g); }
 function updateBoss(dt){
   if(!boss||boss.dead) return;
   const b=boss, p=b.c.root.position; b.t+=dt;
-  p.z+=((b.enraged?2.1:1.5)-b.kb)*dt; b.kb=Math.max(0,b.kb-b.kb*dt*3-dt);
-  p.x+=(clamp(leaderX*0.4,-2,2)-p.x)*Math.min(1,dt*0.5);
-  if(b.flash>0){ b.flash=Math.max(0,b.flash-dt*12); setCharFlash(b.c,b.flash*0.7); }
-  if(b.c.mixer) b.c.mixer.update(dt); else animZombie(b.c,dt,'boss');
+  let fwd=b.enraged?2.1:1.5, lateral=0.5, targetX=clamp(leaderX*0.4,-2,2), moving=1;
+  if(b.type==='juggernaut'){
+    fwd=b.enraged?1.5:1.2; lateral=0.9; targetX=clamp(leaderX*0.85,-3.2,3.2);
+    if(b.stun>0){ b.stun-=dt; fwd=0; lateral=0; moving=0; }
+    else if(b.charging>0){ b.charging-=dt; fwd=6.5; shake=Math.max(shake,0.25); }
+    else if(b.tele>0){ b.tele-=dt; fwd=0; moving=0; b.flash=Math.max(b.flash,0.6+0.4*Math.sin(b.t*30)); if(b.tele<=0) b.charging=1.3; }
+    else { b.chargeT-=dt; if(b.chargeT<=0&&p.z<DEFENSE_Z-12){ b.chargeT=b.enraged?5:7; b.tele=1.0; Sound.play('roar'); showBanner('⚠ 突進してくる！','linear-gradient(90deg,#7f1d1d,#ef4444)'); } }
+  }else if(b.type==='crawler'){
+    if(b.phase==='drop'){
+      b.dropT+=dt/1.6; const k=Math.min(1,b.dropT);
+      p.y=14*(1-easeOut(k)); p.x=lerp(b.dropX,b.dropX*0.5,k); fwd=0; lateral=0;
+      if(k>=1){ b.phase='hunt'; p.y=0; shake=Math.max(shake,0.8); Sound.play('bigboom'); for(let i=0;i<6;i++){ const d=P.smoke.spawn(p.x+rand(-2,2),0.3,p.z+rand(-1,1),rand(-2,2),rand(0.5,1.5),rand(-1,1),1.2,0.8,0x8a8378,2.5); d.a0=0.5; } }
+    }else{
+      fwd=b.enraged?3.2:2.4; lateral=3;
+      b.retarget-=dt; if(b.retarget<=0){ b.retarget=rand(1.0,2.0); b.tx=rand(-3.8,3.8); }
+      targetX=b.tx;
+    }
+  }else if(b.type==='queen'){
+    const hold=!b.enraged&&b.t<28;
+    fwd=(hold&&p.z>=-24)?0:(b.enraged?1.8:1.2); if(fwd===0) moving=0.3;
+  }
+  p.z+=(fwd-b.kb)*dt; b.kb=Math.max(0,b.kb-b.kb*dt*3-dt);
+  p.x+=(targetX-p.x)*Math.min(1,dt*lateral);
+  if(b.shield&&!b.shield.broken){ b.shield.g.position.set(p.x,0,p.z+3.0); }
+  if(b.flash>0){ b.flash=Math.max(0,b.flash-dt*12); setCharFlash(b.c,b.flash*0.45); }
+  if(b.c.mixer) b.c.mixer.update(dt*(moving?1:0.3)); else if(b.c.custom) animCrawler(b.c,dt,fwd); else animZombie(b.c,dt,'boss');
   if(b.c.core){ b.c.core.scale.setScalar((b.c.coreBase||0.12)*(1+0.3*Math.sin(b.t*(b.enraged?14:6)))); }
   if(b.c.aura){ b.c.aura.material.opacity=(b.enraged?0.5:0.3)+0.1*Math.sin(b.t*5); }
-  b.stompT-=dt; if(b.stompT<=0){ b.stompT=b.enraged?0.55:0.8; if(p.z>-30) shake=Math.max(shake,0.2); for(let k=0;k<3;k++){ const d=P.smoke.spawn(p.x+rand(-1.6,1.6),0.3,p.z+rand(-0.8,0.8),rand(-1.5,1.5),rand(0.3,1),rand(-1,1),rand(0.8,1.2),rand(0.5,0.8),0x8a8378,2.5); d.a0=0.45; } }
+  if(b.type!=='crawler'&&moving){ b.stompT-=dt; if(b.stompT<=0){ b.stompT=b.enraged?0.55:0.8; if(p.z>-30) shake=Math.max(shake,0.2); for(let k=0;k<3;k++){ const d=P.smoke.spawn(p.x+rand(-1.6,1.6),0.3,p.z+rand(-0.8,0.8),rand(-1.5,1.5),rand(0.3,1),rand(-1,1),rand(0.8,1.2),rand(0.5,0.8),0x8a8378,2.5); d.a0=0.45; } } }
   b.summon-=dt;
-  if(b.summon<=0&&p.z<DEFENSE_Z-12){
-    b.summon=(b.enraged?3.2:5)*Math.pow(0.95,stage-1);
-    spawnZombie('runner',clamp(p.x-1.6,-LIM,LIM),p.z+2.5); spawnZombie('runner',clamp(p.x+1.6,-LIM,LIM),p.z+2.5);
-    if(stage>=2) spawnZombie('spitter',clamp(p.x+(Math.random()<0.5?-3:3),-LIM,LIM),p.z+1);
+  if(b.summon<=0&&p.z<DEFENSE_Z-12&&b.phase!=='drop'){
+    if(b.type==='queen'){
+      b.summon=(b.enraged?1.6:2.2)*Math.pow(0.96,stage-1);
+      for(let k=0;k<3;k++) spawnZombie(Math.random()<0.35?'runner':'normal',clamp(p.x+rand(-3,3),-LIM,LIM),p.z+rand(1,3));
+      if(Math.random()<0.25&&stage>=2) spawnZombie('spitter',clamp(p.x+rand(-3,3),-LIM,LIM),p.z+1);
+    }else if(b.type==='crawler'){
+      b.summon=(b.enraged?3:4.2)*Math.pow(0.95,stage-1);
+      spawnZombie('runner',clamp(p.x-1.2,-LIM,LIM),p.z+2); spawnZombie('runner',clamp(p.x+1.2,-LIM,LIM),p.z+2);
+    }else if(b.type==='juggernaut'){
+      b.summon=(b.enraged?4:6)*Math.pow(0.95,stage-1);
+      spawnZombie('tank',clamp(p.x+(Math.random()<0.5?-3:3),-LIM,LIM),p.z+1);
+    }else{
+      b.summon=(b.enraged?3.2:5)*Math.pow(0.95,stage-1);
+      spawnZombie('runner',clamp(p.x-1.6,-LIM,LIM),p.z+2.5); spawnZombie('runner',clamp(p.x+1.6,-LIM,LIM),p.z+2.5);
+      if(stage>=2) spawnZombie('spitter',clamp(p.x+(Math.random()<0.5?-3:3),-LIM,LIM),p.z+1);
+    }
   }
-  // 投石：プレイヤーの現在位置を狙って連投（止まっていると当たる）
-
-  if(p.z>=DEFENSE_Z-2.2){
-    hurtSquad(3); p.z-=14; b.kb=0; shake=1.4; Sound.play('bigboom');
+  if(p.z>=DEFENSE_Z-2.2-(b.shield&&!b.shield.broken?3:0)){
+    hurtSquad(3); p.z-=14; b.kb=0; b.charging=0; shake=1.4; Sound.play('bigboom');
     bloodBurst(leaderX,0.8,DEFENSE_Z,20,true);
   }
 }
@@ -1672,6 +1909,7 @@ function onBossDefeated(){
   fxBudget=10;
   for(let i=0;i<5;i++) explosionFx(p.x+rand(-2,2),p.z+rand(-2,2),2);
   bloodBurst(p.x,3,p.z,60,true);
+  removeShield();
   startDying(boss.c,-1,2.2);
   boss=null; E['boss-hud'].classList.remove('show');
   score++; stageKills++;
@@ -1686,14 +1924,16 @@ const THREATS={
   2:'⚠ NEW：スピッター ─ 緑の着弾マークから逃げろ',
   3:'⚠ NEW：炎上車両 ─ 撃って破壊するか、避けろ',
 };
+const BOSS_HINT={juggernaut:'今回のボス：装甲巨人（盾持ち）',crawler:'今回のボス：巨大グモ（左右に素早く動く）',queen:'今回のボス：女王（手下を呼び続ける）'};
 function nextStage(){
   const oldRank=rankFor(stage);
-  stage++; stageTime=0; stageKills=0; bossSpawned=false; stageDamage=0;
+  stage++; stageTime=0; stageKills=0; bossSpawned=false; stageDamage=0; hordeDone=false; hordeState=0;
   spawnTimer=1.2; gateTimer=0.8; crateTimer=3; carTimer=4;
   shieldLeft=up.shield; updateChips();
   if(stage%2===1) setPalette(Math.floor((stage-1)/2));
   const nr=rankFor(stage);
-  showStageBanner('STAGE '+stage,THREATS[stage]||('敵の耐久 x'+hpMul().toFixed(1)+' ─ 数も増えていく'));
+  const bt=BOSS_ORDER[(stage-1)%BOSS_ORDER.length];
+  showStageBanner('STAGE '+stage,THREATS[stage]||BOSS_HINT[bt]||('敵の耐久 x'+hpMul().toFixed(1)+' ─ 数も増えていく'));
   if(nr!==oldRank) setTimeout(()=>{ if(running) showBanner('🎖 昇進！ '+nr,'linear-gradient(90deg,#a16207,#facc15)'); },1200);
 }
 
@@ -1709,7 +1949,7 @@ const PERKS=[
   {id:'rate',icon:'⚡',name:'高速機関部',desc:'連射速度 +12%（最大3回）',ok:()=>up.rateBonus<3,apply:()=>{ up.rateBonus++; }},
   {id:'dmg',icon:'🔺',name:'強装弾',desc:'ダメージ +20%',ok:()=>up.dmg<9,apply:()=>{ up.dmg++; }},
   {id:'gate',icon:'🟦',name:'ゲート工兵',desc:'青ゲートの数値 +1',ok:()=>up.gateBonus<2,apply:()=>{ up.gateBonus++; }},
-  {id:'blast',icon:'💥',name:'高性能炸薬',desc:'爆発弾の範囲 +20%（最大2回）',ok:()=>(up.explosive||curWeapon==='launcher')&&up.blast<2,apply:()=>{ up.blast++; }},
+  {id:'blast',icon:'💥',name:'高性能炸薬',desc:'爆発弾の範囲 +20%（最大2回）',ok:()=>(up.explosive||curW().exp)&&up.blast<2,apply:()=>{ up.blast++; }},
   {id:'shield',icon:'🛡️',name:'防弾シールド',desc:'毎ステージ1回、被弾を無効化',ok:()=>up.shield<2,apply:()=>{ up.shield++; shieldLeft++; }}
 ];
 function openPerks(){
@@ -1918,13 +2158,33 @@ const WEAPONS={
   launcher:{name:'グレネードランチャー',short:'GL',cd:0.72,dmg:3.5,pellets:1,spread:0,jitter:0.2,range:46,speed:52,pen:0,exp:true,blast:2.4,snd:'launcher',desc:'着弾で大爆発',color:'#f87171',hex:0xef4444}
 };
 let curWeapon='ar';
+let wlv={};
+// 同じ武器を3回取ると進化
+const EVO={
+  ar:{name:'パルスライフル',short:'PR',dmg:1.6,pen:2,tracer:'amp',desc:'貫通するパルス弾'},
+  smg:{name:'ツインSMG',short:'2SMG',pellets:2,spread:0.02,desc:'二丁持ちで弾幕倍増'},
+  shotgun:{name:'ドラゴンブレス',short:'DB',pellets:9,exp:true,blast:0.85,splashMul:0.55,desc:'炎の散弾が燃え広がる'},
+  minigun:{name:'レーザーガトリング',short:'LG',dmg:1.4,pen:3,range:10,tracer:'amp',desc:'貫くレーザーの嵐'},
+  sniper:{name:'レールガン',short:'RG',dmg:2,pen:99,cdMul:0.8,tracer:'amp',desc:'直線上の敵を全て貫く'},
+  launcher:{name:'クラスターランチャー',short:'CL',blast:1.3,cluster:true,desc:'爆発がさらに分裂'}
+};
+const wLv=(id)=>wlv[id]||1;
+function curW(){
+  const b=WEAPONS[curWeapon], lv=wLv(curWeapon), e=lv>=3?EVO[curWeapon]:null;
+  return {id:curWeapon,evo:!!e,lv,name:e?e.name:b.name,short:e?e.short:b.short,desc:e?e.desc:b.desc,
+    cd:b.cd*(e&&e.cdMul||1), dmg:b.dmg*(lv>=2?1.15:1)*(e&&e.dmg||1),
+    pellets:e&&e.pellets?e.pellets:b.pellets, spread:e&&e.spread!==undefined?e.spread:b.spread, jitter:b.jitter,
+    range:b.range+(e&&e.range||0), speed:b.speed, pen:b.pen+(e&&e.pen||0), exp:b.exp||!!(e&&e.exp),
+    blast:(b.blast||1.5)*(e&&e.blast||1), splashMul:(e&&e.splashMul)||0.9, cluster:!!(e&&e.cluster), tracer:e&&e.tracer, snd:b.snd, hex:b.hex, color:b.color};
+}
+const wKey=()=>curWeapon+(wLv(curWeapon)>=3?'+':'');
 const RATE_MUL=[1,0.82,0.68,0.57];
-function weaponCd(){ return WEAPONS[curWeapon].cd*RATE_MUL[up.rate-1]*Math.pow(0.88,up.rateBonus); }
+function weaponCd(){ return curW().cd*RATE_MUL[up.rate-1]*Math.pow(0.88,up.rateBonus); }
 // 手続き生成の銃モデル（銃口は -Z 方向、原点は銃の中心付近）
 const GUN_GEO={};
-function gunGeo(id){
-  if(GUN_GEO[id]) return GUN_GEO[id];
-  const b=new CharBuilder(0.001), dk=0x1b1d22, mt=0x3a3f46, wood=0x6b4a2e, ol=0x4f5a3a, acc=WEAPONS[id].hex;
+function gunGeo(id,evo){
+  const key=id+(evo?'+':''); if(GUN_GEO[key]) return GUN_GEO[key];
+  const b=new CharBuilder(0.001), dk=evo?0x5a4514:0x1b1d22, mt=evo?0xc9a13a:0x3a3f46, wood=evo?0x8a6a2a:0x6b4a2e, ol=evo?0x6b5418:0x4f5a3a, acc=evo?0xfff1a8:WEAPONS[id].hex;
   let tip=-0.5;
   const rot=[Math.PI/2,0,0];
   if(id==='ar'){
@@ -1954,26 +2214,38 @@ function gunGeo(id){
     b.add(cyl(0.1,0.1,0.14),0,dk,[0,0,0.05],rot); b.add(rb(0.05,0.15,0.06,0.01),0,dk,[0,-0.13,0.1]);
     b.add(rb(0.05,0.1,0.22,0.02),0,ol,[0,-0.02,0.28]); b.add(rb(0.03,0.04,0.12,0.01),0,acc,[0,0.1,-0.12],null,null,true); tip=-0.52;
   }
-  return GUN_GEO[id]={geo:b.build().geo,tip};
+  if(evo){ b.add(rb(0.03,0.03,0.3,0.01),0,WEAPONS[id].hex,[0.05,0.02,-0.2],null,null,true); b.add(rb(0.03,0.03,0.3,0.01),0,WEAPONS[id].hex,[-0.05,0.02,-0.2],null,null,true); }
+  return GUN_GEO[key]={geo:b.build().geo,tip};
 }
-function makeGunModel(id){
-  if(id==='ar'&&rifleProto) return rifleProto.clone();
-  const g=gunGeo(id), m=new THREE.Mesh(g.geo,[R.gunVC,R.glowMat]); m.castShadow=true;
-  const grp=new THREE.Group(); grp.add(m);
+function makeGunModel(id,evo){
+  if(id==='ar'&&rifleProto&&!evo) return rifleProto.clone();
+  const g=gunGeo(id,evo), m=new THREE.Mesh(g.geo,[R.gunVC,R.glowMat]); m.castShadow=true;
+  const grp=new THREE.Group(); grp.add(m); if(evo) m.scale.setScalar(1.12);
   const mz=new THREE.Object3D(); mz.name='muzzle'; mz.position.set(0,0.02,g.tip); grp.add(mz);
   return grp;
 }
 function setCharWeapon(c){
-  if(!c.rifle||c.wpn===curWeapon) return;
+  if(!c.rifle||c.wpn===wKey()) return;
   if(c.gunModel) c.rifle.remove(c.gunModel);
-  c.gunModel=makeGunModel(curWeapon); c.rifle.add(c.gunModel);
-  c.muzzle=c.gunModel.getObjectByName('muzzle'); c.wpn=curWeapon;
+  c.gunModel=makeGunModel(curWeapon,wLv(curWeapon)>=3); c.rifle.add(c.gunModel);
+  c.muzzle=c.gunModel.getObjectByName('muzzle'); c.wpn=wKey();
 }
 function equipWeapon(id,x,z){
-  curWeapon=id; const W=WEAPONS[id];
+  const W=WEAPONS[id];
+  if(id===curWeapon){
+    wlv[id]=Math.min(3,wLv(id)+1);
+    if(wlv[id]>=3){
+      const cw=curW(); Sound.play('clear'); shake=Math.max(shake,0.6);
+      anim(E['flash'],[{opacity:0.3},{opacity:0}],{duration:400,easing:'ease-out'});
+      showStageBanner('⚡ 武器進化！ ⚡',W.name+' → '+cw.name+'（'+cw.desc+'）');
+      for(const m of squad){ const r=m.c.root.position; for(let k=0;k<6;k++) P.fire.spawn(r.x+rand(-.4,.4),rand(0.5,2),r.z,rand(-1,1),rand(2,4),rand(-1,1),0.5,0.15,0xffffff,1.5); }
+    }else showBanner('🔫 '+W.name+' Lv'+wlv[id]+'！ あと1つで進化','linear-gradient(90deg,#b45309,'+W.color+')');
+  }else{
+    curWeapon=id; wlv[id]=wLv(id);
+    showBanner('🔫 '+curW().name+' 装備！ ─ '+curW().desc,'linear-gradient(90deg,#b45309,'+W.color+')');
+  }
   for(const m of squad){ setCharWeapon(m.c); m.cool=Math.random()*weaponCd(); }
   Sound.play('upgrade'); updateChips();
-  showBanner('🔫 '+W.name+' 装備！ ─ '+W.desc,'linear-gradient(90deg,#b45309,'+W.color+')');
   spawnRing(x,z,3,W.hex);
   for(let i=0;i<14;i++) P.debris.spawn(x,0.8,z,rand(-4,4),rand(4,8),rand(-3,3),0.9,rand(0.05,0.1),W.hex);
 }
@@ -2025,12 +2297,13 @@ const ringMats={};
 function ringMatOf(hex){ return ringMats[hex]||(ringMats[hex]=new THREE.MeshBasicMaterial({color:hex,transparent:true,opacity:0.8,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide})); }
 let pickSeq=0;
 function randomPickupType(exclude){
-  const wpns=Object.keys(WEAPONS).filter(w=>w!==curWeapon&&w!==exclude);
-  if(Math.random()<(runTime<20?0.2:0.38)&&wpns.length) return 'w_'+wpns[Math.floor(Math.random()*wpns.length)];
+  const wpns=Object.keys(WEAPONS).filter(w=>w!==curWeapon&&'w_'+w!==exclude);
+  if(wLv(curWeapon)<3&&exclude!=='w_'+curWeapon&&Math.random()<(runTime<15?0.1:0.22)) return 'w_'+curWeapon;
+  if(Math.random()<(runTime<20?0.2:0.32)&&wpns.length) return 'w_'+wpns[Math.floor(Math.random()*wpns.length)];
   const pool=[];
   if(up.rate<4) pool.push('rate','rate');
   if(up.spread<4) pool.push('spread','spread');
-  if(!up.explosive&&!WEAPONS[curWeapon].exp&&runTime>15) pool.push('explosive');
+  if(!up.explosive&&!curW().exp&&runTime>15) pool.push('explosive');
   if(up.dmg<5) pool.push('dmg','dmg');
   if(up.pen<3) pool.push('pierce');
   if(squad.length<maxSquad) pool.push('medic');
@@ -2043,8 +2316,10 @@ function makePickup(type,x,pid){
   let item, hex, sign;
   if(isW){
     const W=WEAPONS[wid]; hex=W.hex;
-    item=new THREE.Group(); const gm=makeGunModel(wid); gm.scale.multiplyScalar(2.4); item.add(gm);
-    sign=makeSign(W.name,W.desc,'🔫',hex,'NEW WEAPON');
+    const same=(wid===curWeapon), nextLv=wLv(wid)+1, willEvo=same&&nextLv>=3;
+    item=new THREE.Group(); const gm=makeGunModel(wid,willEvo||(!same&&wLv(wid)>=3)); gm.scale.multiplyScalar(2.4); item.add(gm);
+    if(same) sign=makeSign(willEvo?EVO[wid].name:W.name,willEvo?'取ると進化！ '+EVO[wid].desc:'Lv'+wLv(wid)+' → '+nextLv+'（あと1つで進化）',willEvo?'⭐':'🔫',hex,willEvo?'EVOLVE!':'LEVEL UP');
+    else sign=makeSign(wLv(wid)>=3?EVO[wid].name:W.name,W.desc,'🔫',hex,'NEW WEAPON');
   }else{
     const d=PICKUP[type]; hex=d.hex;
     item=new THREE.Mesh(iconGeo(type),[R.gunVC,R.glowMat]); item.scale.setScalar(2.2); item.castShadow=true;
@@ -2176,7 +2451,7 @@ function showStageBanner(main,sub){
 }
 function setChip(id,text,on,max){ setText(id,text); const c=E[id]; c.classList.toggle('on',on&&!max); c.classList.toggle('max',!!max); }
 function updateChips(){
-  setChip('chip-wpn','🔫'+WEAPONS[curWeapon].short,true,false);
+  { const cw=curW(); setChip('chip-wpn','🔫'+cw.short+(cw.evo?'★':' Lv'+cw.lv),true,cw.evo); }
   setChip('chip-rate','⚡RATE '+(up.rate===4?'MAX':'Lv'+up.rate),up.rate>1,up.rate===4);
   setChip('chip-shot','💥'+SPREAD_NAMES[up.spread-1],up.spread>1,up.spread===4);
   setChip('chip-exp',up.explosive?'💣EXP ON':'💣EXP OFF',up.explosive,false);
@@ -2197,7 +2472,7 @@ function updateHud(){
     if(combo>=3){ E['combo'].classList.add('show'); setText('combo-num',combo); setText('combo-mult','SCORE x'+comboMult().toFixed(1)); if(combo%10===0) anim(E['combo-num'],[{transform:'scale(1.6)'},{transform:'scale(1)'}],{duration:260}); }
     else E['combo'].classList.remove('show');
   }
-  E['danger'].classList.toggle('on',dangerOn&&running);
+  E['danger'].classList.toggle('on',(dangerOn||hordeState===2)&&running);
 }
 let hintTimer=0;
 function hideHint(){ E['hint'].classList.remove('show'); }
@@ -2302,7 +2577,8 @@ function resetWorld(){
   squad.forEach(m=>{ releaseChar(m.c); m.flash.visible=false; flashPool.push(m.flash); }); squad.length=0;
   zombies.forEach(z=>{ if(!z.dead) releaseChar(z.c); }); zombies.length=0;
   dying.forEach(d=>releaseChar(d.c)); dying.length=0;
-  if(boss){ releaseChar(boss.c); boss=null; }
+  if(boss){ removeShield(); releaseChar(boss.c); boss=null; }
+  clearProps(); hordeState=0; hordeDone=false;
   bullets.forEach(b=>bulletPool.push(b)); bullets.length=0;
   gates.forEach(disposeGate); gates.length=0;
   crates.forEach(c=>scene.remove(c.grp)); crates.length=0;
@@ -2320,7 +2596,8 @@ function startGame(){
   spawnTimer=1.5; gateTimer=1.0; crateTimer=5.0; clearTimer=0; gameOverT=0; bossSpawned=false;
   shake=0; slowmo=0; ult=0; ultReady=false; ultDirty=true; comboDirty=true;
   leaderX=0; targetX=0; camX=0;
-  curWeapon='ar';
+  curWeapon='ar'; wlv={};
+  barrelTimer=3; tankerTimer=40; barrelHintShown=false;
   up={rate:1,spread:1,explosive:false,dmg:1,range:0,pen:0,crit:0,agility:0,strike:0,gateBonus:0,blast:0,rateBonus:0,shield:0};
   pts=0; maxSquad=8; shieldLeft=0; stageDamage=0; carTimer=4; perkPending=false; choosing=false;
   E['perk-screen'].classList.add('hidden'); setPalette(0,true);
@@ -2351,7 +2628,7 @@ function resumeGame(){ if(!paused) return; paused=false; E['pause-screen'].class
 
 function update(dt,rdt){
   runTime+=dt; if(clearTimer<=0) stageTime+=dt;
-  fxBudget=5; sparkBudget=10;
+  fxBudget=3; sparkBudget=4;
   scrollWorld(dt);
   if(keys.left) targetX=clamp(targetX-11*dt,-LIM,LIM);
   if(keys.right) targetX=clamp(targetX+11*dt,-LIM,LIM);
@@ -2368,6 +2645,8 @@ function update(dt,rdt){
   updateCrates(dt);
   updateStrikes(dt);
   updateCars(dt);
+  updateProps(dt);
+  updateHorde(dt);
   updateHazards(dt);
   updatePalette(dt);
   checkBoss();
@@ -2426,7 +2705,7 @@ function loop(now){
 function setProgress(p){ E['loading-fill'].style.width=Math.floor(p)+'%'; setText('loading-text','PREPARING WEAPONS... ('+Math.floor(p)+'%)'); }
 function prewarm(){
   try{
-    const tmp=[], kinds=['leader','soldier','soldier','soldier','soldier','normal','normal','normal','normal','normal','normal','normal','normal','runner','runner','runner','runner','tank','tank','spitter','spitter','spitter','boss'];
+    const tmp=[], kinds=['leader','soldier','soldier','soldier','soldier','normal','normal','normal','normal','normal','normal','normal','normal','runner','runner','runner','runner','tank','tank','spitter','spitter','spitter','boss','jugg','queen','crawler'];
     kinds.forEach((k,i)=>{ const c=getChar(k); c.root.position.set((i%6-2.5)*1.5,0,-20-Math.floor(i/6)*3); tmp.push(c); });
     spawnCrate();
     hazardPool.acid.push(makeHazardVis('acid')); hazardPool.rock.push(makeHazardVis('rock'));
