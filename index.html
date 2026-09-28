@@ -203,7 +203,7 @@ button{font-family:inherit;cursor:pointer;-webkit-appearance:none;appearance:non
     </div>
     <button id="start-btn" class="btn-main hidden">出撃する</button>
     <button id="sound-btn" class="btn-sub">🔊 サウンド ON</button>
-    <div class="tip">iPhoneが消音モードだと音は鳴りません<br>3D Models: Quaternius（poly.pizza）</div>
+    <div class="tip">iPhoneが消音モードだと音は鳴りません</div>
   </div>
 
   <!-- 一時停止 -->
@@ -241,6 +241,508 @@ button{font-family:inherit;cursor:pointer;-webkit-appearance:none;appearance:non
 
   <div id="error-box"></div>
 </div>
+
+<script type="text/plain" id="sculpt-src">
+// ================= キャラクター造形（SDFスカルプト＋サーフェスネット＋スムーススキニング） =================
+// 滑らかな有機的な体を、距離関数の合成から自動でメッシュ化し、関節ごとに自然に曲がるよう重み付けする
+const SC={};
+SC.add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
+SC.sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+SC.mul=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
+SC.len=(a)=>Math.sqrt(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]);
+SC.norm=(a)=>{ const l=SC.len(a)||1; return [a[0]/l,a[1]/l,a[2]/l]; };
+SC.rgb=(h)=>[((h>>16)&255)/255,((h>>8)&255)/255,(h&255)/255];
+SC.mix=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
+function scHash(x,y,z){ let h=(Math.imul(x,374761393)+Math.imul(y,668265263)+Math.imul(z,1274126177))|0; h=Math.imul(h^(h>>>13),1274126177); h=h^(h>>>16); return (h>>>0)/4294967295; }
+function scNoise(x,y,z){
+  const xi=Math.floor(x),yi=Math.floor(y),zi=Math.floor(z), xf=x-xi,yf=y-yi,zf=z-zi;
+  const u=xf*xf*(3-2*xf), v=yf*yf*(3-2*yf), w=zf*zf*(3-2*zf);
+  const c000=scHash(xi,yi,zi), c100=scHash(xi+1,yi,zi), c010=scHash(xi,yi+1,zi), c110=scHash(xi+1,yi+1,zi);
+  const c001=scHash(xi,yi,zi+1), c101=scHash(xi+1,yi,zi+1), c011=scHash(xi,yi+1,zi+1), c111=scHash(xi+1,yi+1,zi+1);
+  const a0=c000+(c100-c000)*u, a1=c010+(c110-c010)*u, a2=c001+(c101-c001)*u, a3=c011+(c111-c011)*u;
+  const b0=a0+(a1-a0)*v, b1=a2+(a3-a2)*v; return b0+(b1-b0)*w;
+}
+function scFbm(p,f){ return (scNoise(p[0]*f,p[1]*f,p[2]*f)*0.5+scNoise(p[0]*f*2.1+7,p[1]*f*2.1+3,p[2]*f*2.1+1)*0.3+scNoise(p[0]*f*4.3+11,p[1]*f*4.3+5,p[2]*f*4.3+9)*0.2); }
+// プリミティブ：RC＝先細りカプセル、EL＝楕円体
+function RC(a,b,r1,r2,bone,col,k,sub){
+  const ba=SC.sub(b,a), l2=ba[0]*ba[0]+ba[1]*ba[1]+ba[2]*ba[2];
+  if(l2<1e-8) return EL(a,[r1,r1,r1],bone,col,k,sub);
+  let rr=r1-r2; const L=Math.sqrt(l2); if(Math.abs(rr)>L*0.95) rr=Math.sign(rr)*L*0.95;
+  const m=Math.max(r1,r2)+0.001;
+  return {t:0,a,b,ba,l2,rr,r1,r2:r1-rr,a2:l2-rr*rr,il2:1/l2,bone,col,k:k===undefined?0.03:k,sub:!!sub,
+    bb:[Math.min(a[0],b[0])-m,Math.min(a[1],b[1])-m,Math.min(a[2],b[2])-m,Math.max(a[0],b[0])+m,Math.max(a[1],b[1])+m,Math.max(a[2],b[2])+m]};
+}
+function EL(c,r,bone,col,k,sub){
+  return {t:1,c,r,bone,col,k:k===undefined?0.03:k,sub:!!sub,bb:[c[0]-r[0],c[1]-r[1],c[2]-r[2],c[0]+r[0],c[1]+r[1],c[2]+r[2]]};
+}
+function BX(c,b,r,bone,col,rot,k,sub){
+  let m=[1,0,0,0,1,0,0,0,1];
+  if(rot){ const [ax,ay,az]=rot, cx=Math.cos(ax),sx=Math.sin(ax),cy=Math.cos(ay),sy=Math.sin(ay),cz=Math.cos(az),sz=Math.sin(az);
+    // R = Rx*Ry*Rz（列ベクトル）
+    m=[cy*cz,-cy*sz,sy, sx*sy*cz+cx*sz,-sx*sy*sz+cx*cz,-sx*cy, -cx*sy*cz+sx*sz,cx*sy*sz+sx*cz,cx*cy]; }
+  const e=Math.hypot(b[0],b[1],b[2])+0.002;
+  return {t:2,c,b:[b[0]-r,b[1]-r,b[2]-r],r,m,bone,col,k:k===undefined?0:k,sub:!!sub,bb:[c[0]-e,c[1]-e,c[2]-e,c[0]+e,c[1]+e,c[2]+e]};
+}
+function scPrimD(P,x,y,z){
+  if(P.t===2){
+    const px=x-P.c[0],py=y-P.c[1],pz=z-P.c[2], m=P.m;
+    const qx=Math.abs(m[0]*px+m[3]*py+m[6]*pz)-P.b[0], qy=Math.abs(m[1]*px+m[4]*py+m[7]*pz)-P.b[1], qz=Math.abs(m[2]*px+m[5]*py+m[8]*pz)-P.b[2];
+    const ox=Math.max(qx,0),oy=Math.max(qy,0),oz=Math.max(qz,0);
+    return Math.sqrt(ox*ox+oy*oy+oz*oz)+Math.min(Math.max(qx,qy,qz),0)-P.r;
+  }
+  if(P.t===1){
+    const px=(x-P.c[0])/P.r[0], py=(y-P.c[1])/P.r[1], pz=(z-P.c[2])/P.r[2];
+    const k0=Math.sqrt(px*px+py*py+pz*pz), qx=px/P.r[0], qy=py/P.r[1], qz=pz/P.r[2], k1=Math.sqrt(qx*qx+qy*qy+qz*qz);
+    if(k1<1e-9) return -Math.min(P.r[0],P.r[1],P.r[2]);
+    return k0*(k0-1)/k1;
+  }
+  const pax=x-P.a[0], pay=y-P.a[1], paz=z-P.a[2], ba=P.ba;
+  const yy=pax*ba[0]+pay*ba[1]+paz*ba[2], zz=yy-P.l2;
+  const xvx=pax*P.l2-ba[0]*yy, xvy=pay*P.l2-ba[1]*yy, xvz=paz*P.l2-ba[2]*yy;
+  const x2=xvx*xvx+xvy*xvy+xvz*xvz, y2=yy*yy*P.l2, z2=zz*zz*P.l2;
+  const k=Math.sign(P.rr)*P.rr*P.rr*x2;
+  if(Math.sign(zz)*P.a2*z2>k) return Math.sqrt(x2+z2)*P.il2-P.r2;
+  if(Math.sign(yy)*P.a2*y2<k) return Math.sqrt(x2+y2)*P.il2-P.r1;
+  return (Math.sqrt(x2*P.a2*P.il2)+yy*P.rr)*P.il2-P.r1;
+}
+function scLB(P,x,y,z){ const b=P.bb, dx=Math.max(b[0]-x,0,x-b[3]), dy=Math.max(b[1]-y,0,y-b[4]), dz=Math.max(b[2]-z,0,z-b[5]); return Math.sqrt(dx*dx+dy*dy+dz*dz); }
+function scFieldList(prims){
+  // 高速化のためプリミティブを数値配列に詰める
+  const n=prims.length, W=24, T=new Int8Array(n), SUB=new Int8Array(n), A=new Float64Array(n*W);
+  prims.forEach((P,i)=>{ const o=i*W; for(let q=0;q<6;q++) A[o+q]=P.bb[q]; A[o+6]=P.k; T[i]=P.t; SUB[i]=P.sub?1:0;
+    if(P.t===1){ A[o+7]=P.c[0];A[o+8]=P.c[1];A[o+9]=P.c[2];A[o+10]=P.r[0];A[o+11]=P.r[1];A[o+12]=P.r[2]; }
+    else if(P.t===2){ A[o+7]=P.c[0];A[o+8]=P.c[1];A[o+9]=P.c[2];A[o+10]=P.b[0];A[o+11]=P.b[1];A[o+12]=P.b[2];A[o+13]=P.r; for(let q=0;q<9;q++) A[o+14+q]=P.m[q]; }
+    else{ A[o+7]=P.a[0];A[o+8]=P.a[1];A[o+9]=P.a[2];A[o+10]=P.ba[0];A[o+11]=P.ba[1];A[o+12]=P.ba[2];A[o+13]=P.l2;A[o+14]=P.rr;A[o+15]=P.a2;A[o+16]=P.il2;A[o+17]=P.r1;A[o+18]=P.r2; } });
+  return (x,y,z)=>{
+    let D=1e9;
+    for(let i=0;i<n;i++){
+      const o=i*W, k=A[o+6];
+      const dx=Math.max(A[o]-x,0,x-A[o+3]), dy=Math.max(A[o+1]-y,0,y-A[o+4]), dz=Math.max(A[o+2]-z,0,z-A[o+5]), lb2=dx*dx+dy*dy+dz*dz;
+      const sub=SUB[i];
+      const lim=sub?k-D:D+k; if(lim<0||lb2>lim*lim) continue;
+      let d;
+      if(T[i]===2){
+        const px=x-A[o+7],py=y-A[o+8],pz=z-A[o+9];
+        const qx=Math.abs(A[o+14]*px+A[o+17]*py+A[o+20]*pz)-A[o+10], qy=Math.abs(A[o+15]*px+A[o+18]*py+A[o+21]*pz)-A[o+11], qz=Math.abs(A[o+16]*px+A[o+19]*py+A[o+22]*pz)-A[o+12];
+        const ox=qx>0?qx:0,oy=qy>0?qy:0,oz=qz>0?qz:0;
+        d=Math.sqrt(ox*ox+oy*oy+oz*oz)+Math.min(Math.max(qx,qy,qz),0)-A[o+13];
+      }else if(T[i]===1){
+        const rx=A[o+10],ry=A[o+11],rz=A[o+12], px=(x-A[o+7])/rx, py=(y-A[o+8])/ry, pz=(z-A[o+9])/rz;
+        const k0=Math.sqrt(px*px+py*py+pz*pz), qx=px/rx, qy=py/ry, qz=pz/rz, k1=Math.sqrt(qx*qx+qy*qy+qz*qz);
+        d=k1<1e-9?-Math.min(rx,ry,rz):k0*(k0-1)/k1;
+      }else{
+        const pax=x-A[o+7], pay=y-A[o+8], paz=z-A[o+9], bx=A[o+10],by=A[o+11],bz=A[o+12], l2=A[o+13], rr=A[o+14], a2=A[o+15], il2=A[o+16];
+        const yy=pax*bx+pay*by+paz*bz, zz=yy-l2;
+        const xvx=pax*l2-bx*yy, xvy=pay*l2-by*yy, xvz=paz*l2-bz*yy;
+        const x2=xvx*xvx+xvy*xvy+xvz*xvz, y2=yy*yy*l2, z2=zz*zz*l2, kk=(rr>0?1:(rr<0?-1:0))*rr*rr*x2;
+        if((zz>0?1:(zz<0?-1:0))*a2*z2>kk) d=Math.sqrt(x2+z2)*il2-A[o+18];
+        else if((yy>0?1:(yy<0?-1:0))*a2*y2<kk) d=Math.sqrt(x2+y2)*il2-A[o+17];
+        else d=(Math.sqrt(x2*a2*il2)+yy*rr)*il2-A[o+17];
+      }
+      if(!sub){ if(k<=0){ if(d<D) D=d; continue; } const h=Math.max(k-Math.abs(D-d),0)/k; D=(D<d?D:d)-h*h*k*0.25; }
+      else{ d=-d; const h=Math.max(k-Math.abs(D-d),0)/k; D=(D>d?D:d)+h*h*k*0.25; }
+    }
+    return D;
+  };
+}
+// 空間分割：各セルに影響し得るプリミティブだけを評価（大幅高速化）
+function scField(prims,mn,mx,cs){
+  const full=scFieldList(prims);
+  if(!mn) return full;
+  const gx=Math.max(1,Math.ceil((mx[0]-mn[0])/cs)), gy=Math.max(1,Math.ceil((mx[1]-mn[1])/cs)), gz=Math.max(1,Math.ceil((mx[2]-mn[2])/cs));
+  const cells=new Array(gx*gy*gz), rb=cs*0.8661;
+  let kmax=0; for(const P of prims) kmax=Math.max(kmax,P.k);
+  for(let k=0;k<gz;k++) for(let j=0;j<gy;j++) for(let i=0;i<gx;i++){
+    const c=[mn[0]+(i+0.5)*cs,mn[1]+(j+0.5)*cs,mn[2]+(k+0.5)*cs];
+    let U=1e9; for(const P of prims){ if(P.sub) continue; const d=scPrimD(P,c[0],c[1],c[2]); if(d<U) U=d; }
+    U+=rb;
+    const bmin=[c[0]-cs/2,c[1]-cs/2,c[2]-cs/2], bmax=[c[0]+cs/2,c[1]+cs/2,c[2]+cs/2];
+    const list=prims.filter(P=>{ const b=P.bb; let d2=0; for(let a=0;a<3;a++){ const g=Math.max(b[a]-bmax[a],0,bmin[a]-b[a+3]); d2+=g*g; } const d=Math.sqrt(d2); return P.sub?d<P.k+0.03:d<U+P.k+0.005; });
+    cells[i+gx*(j+gy*k)]=list.length===prims.length?full:scFieldList(list.length?list:prims);
+  }
+  return (x,y,z)=>{ const i=Math.floor((x-mn[0])/cs), j=Math.floor((y-mn[1])/cs), k=Math.floor((z-mn[2])/cs);
+    if(i<0||j<0||k<0||i>=gx||j>=gy||k>=gz) return full(x,y,z); return cells[i+gx*(j+gy*k)](x,y,z); };
+}
+// サーフェスネット法で等値面をメッシュ化
+function scMesh(prims,h,opt){
+  opt=opt||{};
+  let mn=[1e9,1e9,1e9], mx=[-1e9,-1e9,-1e9];
+  for(const P of prims){ if(P.sub) continue; for(let a=0;a<3;a++){ mn[a]=Math.min(mn[a],P.bb[a]); mx[a]=Math.max(mx[a],P.bb[a+3]); } }
+  const pad=0.05; mn=mn.map(v=>v-pad); mx=mx.map(v=>v+pad);
+  const F=scField(prims,[mn[0]-0.2,mn[1]-0.2,mn[2]-0.2],[mx[0]+0.2,mx[1]+0.2,mx[2]+0.2],Math.max(0.06,h*6));
+  const nx=Math.ceil((mx[0]-mn[0])/h), ny=Math.ceil((mx[1]-mn[1])/h), nz=Math.ceil((mx[2]-mn[2])/h);
+  const NX=nx+1, NY=ny+1, NZ=nz+1, S=new Float32Array(NX*NY*NZ);
+  // 粗いグリッドで先に評価し、表面付近だけ細かく評価（高速化）
+  const R4=4, cx=Math.ceil(nx/R4)+1, cy=Math.ceil(ny/R4)+1, cz=Math.ceil(nz/R4)+1, H4=h*R4, Cg=new Float32Array(cx*cy*cz);
+  for(let k=0;k<cz;k++) for(let j=0;j<cy;j++) for(let i=0;i<cx;i++) Cg[i+cx*(j+cy*k)]=F(mn[0]+i*H4,mn[1]+j*H4,mn[2]+k*H4);
+  const thr=H4*1.9;
+  for(let k=0;k<NZ;k++){ const kc=Math.min(cz-2,Math.floor(k/R4)), tz=k/R4-kc;
+    for(let j=0;j<NY;j++){ const jc=Math.min(cy-2,Math.floor(j/R4)), ty=j/R4-jc;
+      for(let i=0;i<NX;i++){ const ic=Math.min(cx-2,Math.floor(i/R4)), tx=i/R4-ic;
+        const c000=Cg[ic+cx*(jc+cy*kc)], c100=Cg[ic+1+cx*(jc+cy*kc)], c010=Cg[ic+cx*(jc+1+cy*kc)], c110=Cg[ic+1+cx*(jc+1+cy*kc)],
+              c001=Cg[ic+cx*(jc+cy*(kc+1))], c101=Cg[ic+1+cx*(jc+cy*(kc+1))], c011=Cg[ic+cx*(jc+1+cy*(kc+1))], c111=Cg[ic+1+cx*(jc+1+cy*(kc+1))];
+        const mnc=Math.min(Math.abs(c000),Math.abs(c100),Math.abs(c010),Math.abs(c110),Math.abs(c001),Math.abs(c101),Math.abs(c011),Math.abs(c111));
+        const sgnSame=(c000>0)===(c111>0)&&(c000>0)===(c100>0)&&(c000>0)===(c010>0)&&(c000>0)===(c110>0)&&(c000>0)===(c001>0)&&(c000>0)===(c101>0)&&(c000>0)===(c011>0);
+        if(sgnSame&&mnc>thr){
+          const a=c000+(c100-c000)*tx, b=c010+(c110-c010)*tx, c=c001+(c101-c001)*tx, d=c011+(c111-c011)*tx;
+          const e1=a+(b-a)*ty, e2=c+(d-c)*ty; S[i+NX*(j+NY*k)]=e1+(e2-e1)*tz;
+        }else S[i+NX*(j+NY*k)]=F(mn[0]+i*h,mn[1]+j*h,mn[2]+k*h);
+      }
+    }
+  }
+  const cellV=new Int32Array(nx*ny*nz).fill(-1), pos=[];
+  const CO=[[0,0,0],[1,0,0],[0,1,0],[1,1,0],[0,0,1],[1,0,1],[0,1,1],[1,1,1]];
+  const ED=[[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+  const val=new Float32Array(8);
+  for(let k=0;k<nz;k++) for(let j=0;j<ny;j++) for(let i=0;i<nx;i++){
+    let neg=0;
+    for(let c=0;c<8;c++){ const o=CO[c]; val[c]=S[(i+o[0])+NX*((j+o[1])+NY*(k+o[2]))]; if(val[c]<0) neg++; }
+    if(neg===0||neg===8) continue;
+    let sx=0,sy=0,sz=0,n=0;
+    for(const e of ED){
+      const a=val[e[0]], b=val[e[1]];
+      if((a<0)===(b<0)) continue;
+      const t=a/(a-b), oa=CO[e[0]], ob=CO[e[1]];
+      sx+=oa[0]+(ob[0]-oa[0])*t; sy+=oa[1]+(ob[1]-oa[1])*t; sz+=oa[2]+(ob[2]-oa[2])*t; n++;
+    }
+    cellV[i+nx*(j+ny*k)]=pos.length/3;
+    pos.push(mn[0]+(i+sx/n)*h, mn[1]+(j+sy/n)*h, mn[2]+(k+sz/n)*h);
+  }
+  const idx=[], C=(i,j,k)=>cellV[i+nx*(j+ny*k)];
+  const quad=(a,b,c,d,flip)=>{ if(a<0||b<0||c<0||d<0) return; if(!flip) idx.push(a,b,c,a,c,d); else idx.push(a,c,b,a,d,c); };
+  for(let k=1;k<nz;k++) for(let j=1;j<ny;j++) for(let i=0;i<nx;i++){
+    const v0=S[i+NX*(j+NY*k)], v1=S[(i+1)+NX*(j+NY*k)]; if((v0<0)===(v1<0)) continue;
+    quad(C(i,j-1,k-1),C(i,j,k-1),C(i,j,k),C(i,j-1,k),!(v0<0));
+  }
+  for(let k=1;k<nz;k++) for(let j=0;j<ny;j++) for(let i=1;i<nx;i++){
+    const v0=S[i+NX*(j+NY*k)], v1=S[i+NX*((j+1)+NY*k)]; if((v0<0)===(v1<0)) continue;
+    quad(C(i-1,j,k-1),C(i-1,j,k),C(i,j,k),C(i,j,k-1),!(v0<0));
+  }
+  for(let k=0;k<nz;k++) for(let j=1;j<ny;j++) for(let i=1;i<nx;i++){
+    const v0=S[i+NX*(j+NY*k)], v1=S[i+NX*(j+NY*(k+1))]; if((v0<0)===(v1<0)) continue;
+    quad(C(i-1,j-1,k),C(i,j-1,k),C(i,j,k),C(i-1,j,k),!(v0<0));
+  }
+  // 表面へ吸着・法線
+  const nv=pos.length/3, nrm=new Float32Array(nv*3), e=h*0.4;
+  // 四面体サンプリングで値と勾配を同時に近似
+  const tet=(x,y,z)=>{ const a=F(x+e,y-e,z-e), b=F(x-e,y-e,z+e), c=F(x-e,y+e,z-e), d=F(x+e,y+e,z+e);
+    return [(a+b+c+d)*0.25,(a-b-c+d)/(4*e),(-a-b+c+d)/(4*e),(-a+b-c+d)/(4*e)]; };
+  for(let v=0;v<nv;v++){
+    let x=pos[v*3], y=pos[v*3+1], z=pos[v*3+2];
+    { const t=tet(x,y,z), g2=t[1]*t[1]+t[2]*t[2]+t[3]*t[3];
+      if(g2>1e-8){ let st=t[0]/g2; const L=Math.abs(st)*Math.sqrt(g2); if(L>h*0.6) st*=h*0.6/L; x-=t[1]*st; y-=t[2]*st; z-=t[3]*st; } }
+    const t2=tet(x,y,z), g=[t2[1],t2[2],t2[3]], gl=Math.hypot(g[0],g[1],g[2])||1;
+    pos[v*3]=x; pos[v*3+1]=y; pos[v*3+2]=z; nrm[v*3]=g[0]/gl; nrm[v*3+1]=g[1]/gl; nrm[v*3+2]=g[2]/gl;
+  }
+  // スキンウェイト・色・AO
+  const col=new Float32Array(nv*3), si=new Uint16Array(nv*4), sw=new Float32Array(nv*4);
+  const bw=new Float32Array(32), used=[];
+  for(let v=0;v<nv;v++){
+    const x=pos[v*3], y=pos[v*3+1], z=pos[v*3+2], p=[x,y,z];
+    bw.fill(0); used.length=0;
+    let cr=0,cg=0,cb=0,cw=0, dmin=1e9;
+    const ds=[];
+    for(const P of prims){ if(P.sub) continue; if(scLB(P,x,y,z)>0.2){ ds.push(1e9); continue; } const d=scPrimD(P,x,y,z); ds.push(d); if(d<dmin) dmin=d; }
+    let pi=0; const ss=opt.skinSoft||0.028; const memF=[], memC=[];
+    for(const P of prims){
+      if(P.sub) continue; const d=ds[pi++]; if(d>1e8) continue;
+      const dd=d-dmin; if(dd>ss*9) continue;
+      const w=Math.exp(-dd/ss);
+      if(bw[P.bone]===0) used.push(P.bone); bw[P.bone]+=w;
+      if(dd<0.02){ const wc=Math.exp(-dd/0.005); if(wc>0.03){ let c; if(typeof P.col==='function'){ let q=memF.indexOf(P.col); if(q<0){ q=memF.length; memF.push(P.col); memC.push(P.col(p)); } c=memC[q]; } else c=P.col; cr+=c[0]*wc; cg+=c[1]*wc; cb+=c[2]*wc; cw+=wc; } }
+    }
+    if(cw===0){ cr=cg=cb=0.5; cw=1; }
+    used.sort((a,b)=>bw[b]-bw[a]);
+    let tot=0; for(let q=0;q<4&&q<used.length;q++) tot+=bw[used[q]];
+    for(let q=0;q<4;q++){ if(q<used.length){ si[v*4+q]=used[q]; sw[v*4+q]=bw[used[q]]/tot; } }
+    // AO（距離関数で凹みを暗く）
+    const nx_=nrm[v*3], ny_=nrm[v*3+1], nz_=nrm[v*3+2];
+    let occ=0, sc=1;
+    for(let q=1;q<=3;q++){ const hh=0.022*q; occ+=(hh-F(x+nx_*hh,y+ny_*hh,z+nz_*hh))*sc; sc*=0.6; }
+    const ao=Math.max(0.35,Math.min(1,1-occ*(opt.aoK||7)));
+    const gy2=0.85+0.15*Math.max(0,Math.min(1,(y-0.2)/1.4));
+    col[v*3]=cr/cw*ao*gy2; col[v*3+1]=cg/cw*ao*gy2; col[v*3+2]=cb/cw*ao*gy2;
+  }
+  return {pos:new Float32Array(pos),nrm,col,si,sw,idx};
+}
+function scMerge(a,b){
+  const na=a.pos.length/3;
+  const cat=(x,y,T)=>{ const r=new T(x.length+y.length); r.set(x); r.set(y,x.length); return r; };
+  const idx=a.idx.concat(Array.from(b.idx,v=>v+na));
+  return {pos:cat(a.pos,b.pos,Float32Array),nrm:cat(a.nrm,b.nrm,Float32Array),col:cat(a.col,b.col,Float32Array),si:cat(a.si,b.si,Uint16Array),sw:cat(a.sw,b.sw,Float32Array),idx};
+}
+
+// ================= リグ（骨格） =================
+const SB={root:0,hips:1,spine:2,chest:3,neck:4,head:5,clavL:6,uarmL:7,farmL:8,handL:9,clavR:10,uarmR:11,farmR:12,handR:13,thighL:14,shinL:15,footL:16,thighR:17,shinR:18,footR:19};
+const SB_PARENT=[-1,0,1,2,3,4,3,6,7,8,3,10,11,12,1,14,15,1,17,18];
+function scJoints(o){
+  o=Object.assign({hipY:0.98,chestY:1.32,neckY:1.52,headY:1.62,shW:0.215,hipW:0.105,armLen:1,legLen:1,armOut:1},o||{});
+  const J={o};
+  J.root=[0,0,0]; J.hips=[0,o.hipY,0]; J.spine=[0,o.hipY+0.14,0]; J.chest=[0,o.chestY,0]; J.neck=[0,o.neckY,0]; J.head=[0,o.headY,0];
+  for(const s of [-1,1]){
+    const S=s<0?'L':'R';
+    J['clav'+S]=[s*0.05,o.neckY-0.06,0];
+    const sh=[s*o.shW,o.neckY-0.07,0], el=SC.add(sh,[s*0.11*o.armOut,-0.27*o.armLen,0.01]), wr=SC.add(el,[s*0.08*o.armOut,-0.24*o.armLen,-0.01]);
+    J['uarm'+S]=sh; J['farm'+S]=el; J['hand'+S]=wr; J['handC'+S]=SC.add(wr,SC.mul(SC.norm(SC.sub(wr,el)),0.065));
+    const hj=[s*o.hipW,o.hipY-0.06,0], kn=[s*(o.hipW+0.015),(o.hipY-0.06)-0.43*o.legLen*(o.hipY/0.98),-0.01], an=[s*(o.hipW+0.02),0.085,0.01];
+    J['thigh'+S]=hj; J['shin'+S]=kn; J['foot'+S]=an; J['toe'+S]=SC.add(an,[0,-0.05,-0.16]);
+  }
+  return J;
+}
+const SB_NAMES=['root','hips','spine','chest','neck','head','clavL','uarmL','farmL','handL','clavR','uarmR','farmR','handR','thighL','shinL','footL','thighR','shinR','footR'];
+// 人型ベース（体）
+function scHumanBody(J,C,o){
+  o=Object.assign({tw:1,td:1,thick:1,belly:0,hand:1,boot:1,glutes:1},o||{});
+  const P=[], hy=J.o.hipY, cy=J.o.chestY, ny=J.o.neckY, tw=o.tw, td=o.td, th=o.thick;
+  P.push(EL([0,hy-0.01,0.005],[0.168*tw,0.12,0.12*td],SB.hips,C.pants,0.06));
+  P.push(RC([0,hy+0.02,0],[0,hy+0.25,0],0.14*tw,0.152*tw,SB.spine,C.torsoLow||C.torso,0.07));
+  if(o.belly>0) P.push(EL([0,hy+0.13,-0.05*td],[0.15*tw*o.belly,0.13*o.belly,0.13*td*o.belly],SB.spine,C.belly||C.torso,0.08));
+  P.push(EL([0,cy+0.02,0.005],[0.19*tw,0.16,0.125*td],SB.chest,C.torso,0.07));
+  P.push(EL([0,cy+0.03,-0.05*td],[0.15*tw,0.09,0.08*td],SB.chest,C.torso,0.06));
+  P.push(RC([-J.o.shW+0.03,ny-0.07,0],[J.o.shW-0.03,ny-0.07,0],0.072*th,0.072*th,SB.chest,C.torso,0.06));
+  P.push(RC([-0.09,ny-0.03,0.025],[0.09,ny-0.03,0.025],0.056*th,0.056*th,SB.chest,C.torso,0.05));
+  P.push(RC([0,ny-0.07,0],[0,J.o.headY+0.02,0.005],0.068*Math.max(1,th*0.9),0.058*Math.max(1,th*0.9),SB.neck,C.neck||C.skin,0.04));
+  for(const s of [-1,1]){
+    const S=s<0?'L':'R', sh=J['uarm'+S], el=J['farm'+S], wr=J['hand'+S];
+    P.push(EL(SC.add(sh,[s*0.02,-0.04,0]),[0.076*th,0.088*th,0.08*th],SB['uarm'+S],C.sleeve||C.torso,0.035));
+    P.push(RC(sh,el,0.064*th,0.05*th,SB['uarm'+S],C.sleeve||C.torso,0.03));
+    P.push(RC(el,wr,0.052*th,0.036*th,SB['farm'+S],C.forearm||C.sleeve||C.torso,0.025));
+    P.push(EL(SC.add(el,SC.mul(SC.sub(wr,el),0.3)),[0.05*th,0.07,0.05*th],SB['farm'+S],C.forearm||C.sleeve||C.torso,0.03));
+    P.push(EL(J['handC'+S],[0.037*o.hand*th,0.062*o.hand,0.052*o.hand*th],SB['hand'+S],C.hand||C.skin,0.02));
+    const hj=J['thigh'+S], kn=J['shin'+S], an=J['foot'+S];
+    P.push(EL([s*0.075,hy-0.07,0.06*td],[0.085*th*o.glutes,0.09,0.07*th*o.glutes],SB.hips,C.pants,0.05));
+    P.push(RC(hj,kn,0.1*th,0.066*th,SB['thigh'+S],C.pants,0.035));
+    P.push(EL(SC.add(hj,SC.mul(SC.sub(kn,hj),0.35)),[0.095*th,0.14,0.095*th],SB['thigh'+S],C.pants,0.04));
+    P.push(RC(kn,an,0.06*th,0.042*th,SB['shin'+S],C.shin||C.pants,0.03));
+    P.push(EL(SC.add(kn,[0,-0.13,0.035]),[0.055*th,0.095,0.055*th],SB['shin'+S],C.shin||C.pants,0.03));
+    P.push(RC(an,J['toe'+S],0.047*o.boot,0.037*o.boot,SB['foot'+S],C.foot,0.02));
+    P.push(EL(SC.add(an,[0,-0.03,0.02]),[0.045*o.boot,0.04,0.05*o.boot],SB['foot'+S],C.foot,0.02));
+  }
+  return P;
+}
+// 頭部（高解像度で別メッシュ化）
+function scHead(J,C,o){
+  o=Object.assign({zombie:false,hs:1,jawOpen:0,bald:false,sunken:false},o||{});
+  const hy=J.o.headY, s=o.hs*1.08, P=[], H=(x,y,z)=>[x*s,hy+y*s,z*s];
+  P.push(RC([0,hy-0.07,0],H(0,0.05,0.008),0.052*Math.max(1,s*0.95),0.052*s,SB.neck,C.neck||C.skin,0.03));
+  P.push(EL(H(0,0.11,0.01),[0.08*s,0.095*s,0.098*s],SB.head,C.skull||C.skin,0.03));
+  P.push(RC(H(0,0.075,-0.03),H(0,0.014-o.jawOpen*0.012,-0.05),0.062*s,0.034*s,SB.head,C.skin,0.03));
+  for(const x of [-1,1]){
+    P.push(EL(H(x*0.045,0.078,-0.058),[0.026*s,0.02*s,0.024*s],SB.head,C.skin,0.02));
+    P.push(EL(H(x*0.079,0.088,0.008),[0.011*s,0.024*s,0.017*s],SB.head,C.skin,0.01));
+  }
+  P.push(RC(H(0,0.098,-0.092),H(0,0.06,-0.108),0.011*s,0.017*s,SB.head,C.skin,0.012));
+  P.push(RC(H(-0.046,0.115,-0.08),H(0.046,0.115,-0.08),0.014*s,0.014*s,SB.head,C.brow||C.skin,0.015));
+  if(o.extra) o.extra(P,H,s);
+  for(const x of [-1,1]) P.push(EL(H(x*0.034,0.094,-0.088),[0.019*s,0.014*s,0.016*s],SB.head,C.skin,0.012,true));
+  if(o.zombie){
+    P.push(EL(H(0,0.042-o.jawOpen*0.006,-0.07),[0.024*s,0.011*s+o.jawOpen*0.008*s,0.028*s],SB.head,C.skin,0.008,true));
+    if(o.sunken) for(const x of [-1,1]) P.push(EL(H(x*0.052,0.06,-0.07),[0.02*s,0.02*s,0.02*s],SB.head,C.skin,0.015,true));
+  }
+  return P;
+}
+
+// ================= 配色（ノイズで迷彩・汚れ・傷） =================
+function camoFn(cols,f,dirt){
+  const C=cols.map(SC.rgb), dk=SC.rgb(0x2a2418);
+  return (p)=>{
+    const n=scFbm(p,f), m=scFbm([p[0]+13,p[1]+7,p[2]+3],f*1.3);
+    let c=n<0.42?C[0]:(n<0.56?C[1]:(m<0.5?C[2]:C[3]||C[1]));
+    const d=Math.max(0,(0.55-p[1])*1.2)*(dirt||0.6)*scFbm(p,9);
+    return SC.mix(c,dk,Math.min(0.6,d));
+  };
+}
+function skinFn(base,var2,opts){
+  opts=opts||{}; const A=SC.rgb(base), B=SC.rgb(var2||base), vein=SC.rgb(opts.vein||0x3a2240), blood=SC.rgb(0x5a0808);
+  return (p)=>{
+    let c=SC.mix(A,B,scFbm(p,11));
+    if(opts.vein){ const v=Math.abs(scNoise(p[0]*22,p[1]*22,p[2]*22)-0.5); if(v<0.025) c=SC.mix(c,vein,0.4); }
+    if(opts.blood){ const b=scFbm([p[0]+3,p[1],p[2]+5],13); if(b>0.66) c=SC.mix(c,blood,Math.min(0.85,(b-0.66)*6)); }
+    if(opts.mouthBlood&&p[2]<-0.055&&Math.abs(p[0])<0.05&&p[1]<opts.mouthBlood&&p[1]>opts.mouthBlood-0.1){ const b=scFbm(p,20); if(b>0.5) c=SC.mix(c,blood,0.6); }
+    return c;
+  };
+}
+function clothFn(base,skinC,opts){
+  opts=opts||{}; const A=SC.rgb(base), dirt=SC.rgb(opts.dirt||0x2b2319), S=typeof skinC==='function'?skinC:()=>SC.rgb(skinC), wound=SC.rgb(0x6a0c0c), blood=SC.rgb(0x4a0606);
+  return (p)=>{
+    let c=SC.mix(A,SC.mix(A,dirt,0.7),scFbm(p,8)*0.7);
+    const t=scFbm([p[0]+21,p[1]+4,p[2]+9],opts.tearF||7);
+    if(t>(opts.tear||0.7)){ const e=(t-(opts.tear||0.7)); c=e<0.025?wound:S(p); }
+    if(opts.blood){ const b=scFbm([p[0]+5,p[1]+11,p[2]],10); if(b>0.64) c=SC.mix(c,blood,Math.min(0.8,(b-0.64)*5)); }
+    return c;
+  };
+}
+
+
+// ================= 装備・発光パーツ（ハードサーフェス） =================
+function eyesGlow(J,col,hs,out){
+  const s=(hs||1)*1.08, hy=J.o.headY, c=SC.rgb(col);
+  for(const x of [-1,1]) out.push(EL([x*0.034*s,hy+0.094*s,-0.082*s],[0.011*s,0.009*s,0.008*s],SB.head,c,0));
+}
+function gearSoldier(J,leader){
+  const G=[], L=[], hy=J.o.headY, cy=J.o.chestY, hp=J.o.hipY, s=1.08;
+  const vest=SC.rgb(leader?0x252b36:0x4a4f36), pouch=SC.rgb(leader?0x39424f:0x6b6048), strap=SC.rgb(0x22241f), helm=SC.rgb(leader?0x2c3444:0x4f5838), metal=SC.rgb(0x2a2c30), team=SC.rgb(leader?0xfacc15:0x38bdf8);
+  // ヘルメット
+  G.push(EL([0,hy+0.132*s,0.012],[0.103*s,0.086*s,0.112*s],SB.head,helm,0.01));
+  G.push(BX([0,hy+0.03,0.01],[0.2,0.075,0.2],0.01,SB.head,helm,null,0.01,true));
+  G.push(RC([-0.1*s,hy+0.11*s,0.03],[0.1*s,hy+0.11*s,0.03],0.012,0.012,SB.head,strap,0.004));
+  G.push(BX([0,hy+0.16*s,-0.105*s],[0.025,0.022,0.018],0.006,SB.head,metal,null,0.004));
+  G.push(BX([0,hy+0.1*s,-0.1*s],[0.075,0.019,0.014],0.008,SB.head,SC.rgb(0x15181c),null,0.004));
+  L.push(BX([0,hy+0.1*s,-0.113*s],[0.062,0.012,0.004],0.004,SB.head,SC.mix(team,[0,0,0],0.35),null,0));
+  // プレートキャリア
+  G.push(BX([0,cy-0.02,0.0],[0.2,0.16,0.145],0.035,SB.chest,vest,null,0.01));
+  for(const x of [-0.11,0,0.11]) G.push(BX([x,cy-0.08,-0.16],[0.045,0.06,0.03],0.012,SB.chest,pouch,null,0.006));
+  G.push(BX([0,cy+0.04,-0.155],[0.09,0.035,0.02],0.01,SB.chest,pouch,null,0.006));
+  for(const x of [-1,1]) G.push(RC([x*0.1,cy+0.12,-0.1],[x*0.12,cy+0.17,0.09],0.022,0.022,SB.chest,strap,0.01));
+  // バックパック
+  G.push(BX([0,cy+0.01,0.215],[0.14,0.18,0.075],0.035,SB.chest,pouch,null,0.01));
+  G.push(RC([-0.13,cy+0.21,0.2],[0.13,cy+0.21,0.2],0.05,0.05,SB.chest,SC.rgb(0x6f7a4c),0.01));
+  L.push(BX([0,cy+0.08,0.292],[0.05,0.015,0.004],0.004,SB.chest,team,null,0));
+  if(leader){ G.push(RC([0.1,cy+0.15,0.25],[0.1,cy+0.62,0.25],0.008,0.006,SB.chest,metal,0)); L.push(EL([0.1,cy+0.63,0.25],[0.016,0.016,0.016],SB.chest,SC.rgb(0xff3b3b),0)); }
+  // ベルト・ポーチ
+  G.push(BX([0,hp+0.07,0.0],[0.19,0.035,0.14],0.025,SB.hips,strap,null,0.006));
+  for(const x of [-0.14,0.14]) G.push(BX([x,hp+0.05,0.1],[0.04,0.05,0.035],0.012,SB.hips,pouch,null,0.006));
+  G.push(BX([0.17,hp-0.1,-0.02],[0.03,0.07,0.05],0.012,SB.thighR,pouch,null,0.006));
+  // 肘・膝パッド、腕章
+  for(const x of [-1,1]){ const S=x<0?'L':'R';
+    G.push(EL(SC.add(J['shin'+S],[0,0.0,-0.055]),[0.058,0.06,0.035],SB['shin'+S],strap,0.004));
+    G.push(EL(SC.add(J['farm'+S],[0,0.0,0.04]),[0.045,0.045,0.03],SB['farm'+S],strap,0.004));
+    const a=J['uarm'+S], e=J['farm'+S], d=SC.sub(e,a);
+    L.push(RC(SC.add(a,SC.mul(d,0.35)),SC.add(a,SC.mul(d,0.45)),0.069,0.066,SB['uarm'+S],team,0));
+  }
+  return {gear:G,glow:L};
+}
+function gearTank(J){
+  const G=[], L=[], cy=J.o.chestY, metal=SC.rgb(0x4a4f57), dark=SC.rgb(0x2b2e33), glow=SC.rgb(0xff7a1a);
+  G.push(BX([0,cy-0.02,-0.2],[0.2,0.15,0.03],0.02,SB.chest,metal,[0.1,0,0.05],0.004));
+  G.push(EL([0.3,cy+0.14,0.0],[0.11,0.06,0.13],SB.uarmR,metal,0.004));
+  G.push(EL([-0.29,cy+0.13,0.02],[0.09,0.05,0.11],SB.uarmL,dark,0.004));
+  for(const q of [[0.12,cy+0.06],[-0.12,cy+0.06],[0.12,cy-0.12],[-0.12,cy-0.12]]) G.push(EL([q[0],q[1],-0.235],[0.014,0.014,0.01],SB.chest,SC.rgb(0xaab2bc),0));
+  L.push(BX([0.26,cy-0.05,-0.19],[0.008,0.08,0.01],0.004,SB.chest,glow,[0,0,0.4],0));
+  L.push(BX([-0.25,cy-0.12,-0.17],[0.008,0.06,0.01],0.004,SB.chest,glow,[0,0,-0.3],0));
+  eyesGlow(J,0xff5a1f,0.92,L);
+  return {gear:G,glow:L};
+}
+function gearSpitter(J){
+  const L=[], hy=J.o.hipY, g=SC.rgb(0xb8f53c);
+  L.push(EL([0,hy+0.2,-0.3],[0.12,0.12,0.06],SB.spine,g,0));
+  for(const q of [[-0.15,hy+0.1,-0.26],[0.16,hy+0.3,-0.24],[0.05,hy+0.05,-0.27],[-0.08,hy+0.34,0.2],[0.1,hy+0.4,0.22]]) L.push(EL(q,[0.028,0.028,0.02],SB.spine,g,0));
+  L.push(EL([0,J.o.headY+0.045,-0.085],[0.022,0.012,0.01],SB.head,g,0));
+  eyesGlow(J,0xeaff5a,1,L);
+  return {gear:[],glow:L};
+}
+function gearBoss(J,type){
+  const G=[], L=[], cy=J.o.chestY, hy=J.o.headY, bone=SC.rgb(0xe3d7bc), armor=SC.rgb(0x23262c);
+  if(type==='boss'){
+    for(const x of [-1,1]){ const sh=J[x<0?'uarmL':'uarmR'];
+      G.push(BX(SC.add(sh,[x*0.04,0.07,0]),[0.13,0.05,0.15],0.02,SB[x<0?'uarmL':'uarmR'],armor,[0,0,-x*0.3],0.004));
+      for(let k=0;k<3;k++){ const b=SC.add(sh,[x*(0.05+k*0.03),0.1,-0.08+k*0.08]); G.push(RC(b,SC.add(b,[x*0.1,0.2,0]),0.035,0.004,SB.chest,bone,0.01)); } }
+    for(let k=0;k<5;k++){ const b=[0,cy+0.18-k*0.1,0.2+k*0.01]; G.push(RC(b,SC.add(b,[0,0.12,0.2]),0.045-k*0.004,0.004,SB.chest,bone,0.01)); }
+    for(const x of [-1,1]){ const b=[x*0.08,hy+0.18,0.0]; G.push(RC(b,SC.add(b,[x*0.13,0.16,-0.04]),0.035,0.004,SB.head,bone,0.01)); }
+    L.push(EL([0,cy-0.02,-0.2],[0.07,0.07,0.04],SB.chest,SC.rgb(0xff2a2a),0));
+    eyesGlow(J,0xff2020,0.95,L);
+  }else if(type==='jugg'){
+    const plate=SC.rgb(0x353a42), rust=SC.rgb(0x5a3a2a);
+    G.push(EL([0,cy+0.01,-0.01],[0.3,0.2,0.2],SB.chest,armor,0.02));
+    G.push(EL([0,cy+0.02,-0.05],[0.24,0.16,0.19],SB.chest,plate,0.02));
+    for(let k=0;k<3;k++) G.push(BX([0,J.o.hipY+0.22-k*0.075,-0.17+k*0.01],[0.16-k*0.015,0.03,0.04],0.02,SB.spine,k%2?rust:armor,[0.15,0,0],0.004));
+    for(const q of [[-0.14,cy+0.1],[0.14,cy+0.1],[-0.16,cy-0.06],[0.16,cy-0.06]]) G.push(EL([q[0],q[1],-0.2],[0.018,0.018,0.012],SB.chest,SC.rgb(0x9aa3ad),0));
+    for(const x of [-1,1]){ const S=x<0?'L':'R', sh=J['uarm'+S];
+      G.push(EL(SC.add(sh,[x*0.05,0.05,0]),[0.15,0.1,0.16],SB['uarm'+S],armor,0.01));
+      G.push(EL(SC.add(sh,[x*0.09,0.0,0]),[0.1,0.08,0.13],SB['uarm'+S],plate,0.01));
+      G.push(RC(SC.add(J['farm'+S],SC.mul(SC.sub(J['hand'+S],J['farm'+S]),0.2)),SC.add(J['farm'+S],SC.mul(SC.sub(J['hand'+S],J['farm'+S]),0.85)),0.085,0.07,SB['farm'+S],armor,0.01));
+      G.push(RC(SC.add(J['shin'+S],[0,-0.03,-0.02]),SC.add(J['shin'+S],[0,-0.3,-0.02]),0.085,0.07,SB['shin'+S],armor,0.01)); }
+    G.push(EL([0,hy+0.12,0.0],[0.115,0.13,0.125],SB.head,armor,0.01));
+    G.push(BX([0,hy+0.1,-0.11],[0.08,0.035,0.02],0.015,SB.head,plate,null,0.004));
+    L.push(BX([0,hy+0.105,-0.128],[0.065,0.007,0.004],0.003,SB.head,SC.rgb(0xffa31a),null,0));
+  }else{
+    for(let k=0;k<5;k++){ const a=(k-2)*0.35, b=[Math.sin(a)*0.07,hy+0.19,Math.cos(a)*0.01]; G.push(RC(b,SC.add(b,[Math.sin(a)*0.06,0.18,0.02]),0.022,0.003,SB.head,bone,0.008)); }
+    for(const x of [-1,1]) for(let k=0;k<4;k++){ const b=[x*0.08,cy+0.1-k*0.04,0.14]; G.push(RC(b,SC.add(b,[x*(0.28+k*0.06),0.45-k*0.12,0.25]),0.04-k*0.006,0.004,SB.chest,bone,0.01)); }
+    for(const x of [-1,1]){ const S=x<0?'L':'R', h=J['handC'+S], d=SC.norm(SC.sub(J['hand'+S],J['farm'+S])); for(let k=-1;k<=1;k++){ const b=SC.add(h,[k*0.018,-0.03,-0.01]); G.push(RC(b,SC.add(b,SC.mul(d,0.16)),0.012,0.002,SB['hand'+S],bone,0.004)); } }
+    for(const q of [[-0.1,cy+0.05,0.19],[0.1,cy+0.05,0.19],[0,cy-0.1,0.2],[0,cy+0.17,0.17]]) L.push(EL(q,[0.06,0.06,0.05],SB.chest,SC.rgb(0xd946ef),0));
+    L.push(EL([0,cy,-0.17],[0.045,0.045,0.03],SB.chest,SC.rgb(0xf0abfc),0));
+    eyesGlow(J,0xe879f9,1.05,L);
+  }
+  return {gear:G,glow:L};
+}
+
+// ================= キャラクター設計 =================
+const SCULPT_DESIGNS={};
+SCULPT_DESIGNS.soldier=(v,leader)=>{
+  const J=scJoints({});
+  const camo=leader?camoFn([0x3f4a5c,0x5a6678,0x2b3340,0x6e7888],6,0.4):camoFn([0x5b6644,0x7a7a52,0x3e4630,0x8a7d5a],6,0.6);
+  const skin=skinFn(0xd9a57e,0xc48e68);
+  const C={pants:camo,torso:camo,sleeve:camo,skin,neck:skin,hand:SC.rgb(0x1e1f22),foot:SC.rgb(0x2a2119),shin:camo};
+  return {J,body:scHumanBody(J,C,{boot:1.18,hand:1.05}),head:scHead(J,{skin,neck:skin},{}),...gearSoldier(J,leader)};
+};
+SCULPT_DESIGNS.normal=(v)=>{
+  const J=scJoints({armOut:1.1});
+  const sk=[[0x8f9f86,0x7d8c72],[0x9aa39a,0x86908a],[0xa3a07c,0x8c8a66]][v%3];
+  const skin=skinFn(sk[0],sk[1],{vein:0x3c2a44,blood:true,mouthBlood:J.o.headY+0.06});
+  const shirt=[0x3c6f76,0x7d4a38,0x5a5a82][v%3], pantsC=[0x3a475c,0x4a4136,0x2f3a2f][v%3];
+  const C={pants:clothFn(pantsC,skin,{tear:0.74}),torso:clothFn(shirt,skin,{tear:0.68,tearF:5,blood:true}),sleeve:clothFn(shirt,skin,{tear:0.64,tearF:5,blood:true}),forearm:skin,skin,neck:skin,hand:skin,foot:v===1?skin:SC.rgb(0x2a241e),shin:clothFn(pantsC,skin,{tear:0.66})};
+  return {J,body:scHumanBody(J,C,{thick:v===2?0.92:1}),head:scHead(J,{skin,skull:v===0?hairFn(skin,0x2b211c,J.o.headY):(v===1?hairFn(skin,0x5a4a3a,J.o.headY+0.02):skin)},{zombie:true,jawOpen:1,sunken:true}),...(()=>{ const L=[]; eyesGlow(J,v===1?0xff4a3a:0xffd84a,1,L); return {gear:[],glow:L}; })()};
+};
+function hairFn(skin,hair,hy){ const H=SC.rgb(hair); return (p)=>{ const n=scFbm(p,18), top=p[1]-hy; return (top>0.13&&n>0.32)||(top>0.09&&p[2]>0&&n>0.4)?SC.mix(H,SC.rgb(0x000000),n*0.4):skin(p); }; }
+SCULPT_DESIGNS.runner=(v)=>{
+  const J=scJoints({shW:0.17,armLen:1.05,legLen:1.02});
+  const skin=skinFn(0xb9c2b0,0xa4ad9c,{vein:0x3a2a46,blood:true,mouthBlood:J.o.headY+0.06});
+  const hood=[0x9b1c1c,0x2f5f9e][v%2];
+  const C={pants:clothFn(0x24262c,skin,{tear:0.72}),torso:clothFn(hood,skin,{tear:0.7,blood:true}),sleeve:clothFn(hood,skin,{tear:0.72}),forearm:skin,skin,neck:skin,hand:skin,foot:SC.rgb(0xd8d8d0),shin:clothFn(0x24262c,skin,{tear:0.7})};
+  return {J,body:scHumanBody(J,C,{tw:0.86,td:0.9,thick:0.84}),head:scHead(J,{skin},{zombie:true,jawOpen:1.4,sunken:true,extra:(P,H,s)=>{ P.push(EL(H(0,0.115,0.03),[0.094*s,0.108*s,0.1*s],SB.head,SC.rgb(hood),0.015)); P.push(RC(H(0,0.03,0.05),H(0,-0.06,0.07),0.075*s,0.085*s,SB.neck,SC.rgb(hood),0.03)); }}),...(()=>{ const L=[]; eyesGlow(J,0xff3030,1,L); return {gear:[],glow:L}; })()};
+};
+SCULPT_DESIGNS.tank=()=>{
+  const J=scJoints({shW:0.27,hipW:0.13,neckY:1.5,headY:1.58,armLen:1.08,armOut:1.25});
+  const skin=skinFn(0x6e6480,0x5a5068,{vein:0x2a1830,blood:true,mouthBlood:J.o.headY+0.05});
+  const C={pants:clothFn(0x2e3440,skin,{tear:0.75}),torso:skin,sleeve:skin,skin,neck:skin,hand:skin,foot:SC.rgb(0x1a1a1a),belly:skin};
+  const body=scHumanBody(J,C,{tw:1.45,td:1.35,thick:1.55,belly:1.25,hand:1.3});
+  body.push(EL([0,1.5,0.1],[0.22,0.13,0.15],SB.chest,skin,0.08));
+  for(const q of [[-0.24,1.42,0.05,0.07],[0.18,1.28,-0.14,0.06],[0.1,1.5,0.15,0.08]]) body.push(EL([q[0],q[1],q[2]],[q[3],q[3],q[3]],SB.chest,SC.rgb(0x7a3a4a),0.03));
+  return {J,body,head:scHead(J,{skin},{zombie:true,jawOpen:0.8,hs:0.92}),...gearTank(J)};
+};
+SCULPT_DESIGNS.spitter=()=>{
+  const J=scJoints({armOut:1.25});
+  const skin=skinFn(0x98aa5c,0x7f9048,{vein:0x3a4a10,blood:false,mouthBlood:J.o.headY+0.06});
+  const C={pants:clothFn(0x3b3a2c,skin,{tear:0.7}),torso:clothFn(0x5e5140,skin,{tear:0.55}),sleeve:skin,skin,neck:skin,hand:skin,foot:skin,belly:skin};
+  const body=scHumanBody(J,C,{thick:0.85,belly:1.7});
+  body.push(EL([0,J.o.neckY-0.02,-0.04],[0.1,0.08,0.09],SB.neck,skin,0.05));
+  return {J,body,head:scHead(J,{skin},{zombie:true,jawOpen:1.8}),...gearSpitter(J)};
+};
+SCULPT_DESIGNS.boss=()=>{
+  const J=scJoints({shW:0.29,hipW:0.13,neckY:1.5,headY:1.58,armLen:1.18,armOut:1.3});
+  const skin=skinFn(0x6a1f28,0x4e141c,{vein:0xff3a2a,blood:true});
+  const C={pants:clothFn(0x1f1c1c,skin,{tear:0.7}),torso:skin,sleeve:skin,skin,neck:skin,hand:skin,foot:skin,belly:skin};
+  const body=scHumanBody(J,C,{tw:1.5,td:1.35,thick:1.65,hand:1.4});
+  body.push(EL([0,1.52,0.12],[0.26,0.15,0.17],SB.chest,skin,0.09));
+  const bone=SC.rgb(0xe3d7bc);
+  for(let i=0;i<4;i++) body.push(RC([-0.1+i*0.0,1.38-i*0.06,-0.17],[0.1,1.38-i*0.06,-0.17],0.018,0.018,SB.chest,bone,0.015));
+  return {J,body,head:scHead(J,{skin},{zombie:true,jawOpen:1.2,hs:0.95}),...gearBoss(J,'boss')};
+};
+SCULPT_DESIGNS.jugg=()=>{
+  const J=scJoints({shW:0.28,hipW:0.13,neckY:1.5,headY:1.58,armLen:1.1,armOut:1.3});
+  const skin=skinFn(0x6b6f78,0x575a62,{vein:0x2a2a30,blood:true});
+  const C={pants:clothFn(0x23262c,skin,{tear:0.8}),torso:skin,sleeve:skin,skin,neck:skin,hand:skin,foot:SC.rgb(0x181818),belly:skin};
+  const body=scHumanBody(J,C,{tw:1.5,td:1.4,thick:1.6,belly:1.1,hand:1.35});
+  return {J,body,head:scHead(J,{skin},{zombie:true,jawOpen:0.6,hs:0.9}),...gearBoss(J,'jugg')};
+};
+SCULPT_DESIGNS.queen=()=>{
+  const J=scJoints({shW:0.2,neckY:1.6,headY:1.71,hipY:1.02,chestY:1.4,armLen:1.3,legLen:1.05,armOut:1.2});
+  const skin=skinFn(0x9a86b0,0x7a6690,{vein:0xd946ef});
+  const C={pants:skin,torso:skin,sleeve:skin,skin,neck:skin,hand:skin,foot:skin,belly:skin};
+  const body=scHumanBody(J,C,{tw:0.95,td:0.95,thick:0.95,belly:0.9,hand:1.2});
+  return {J,body,head:scHead(J,{skin},{zombie:true,jawOpen:1,hs:1.05}),...gearBoss(J,'queen')};
+};
+
+function scBuildDesign(kind,v){
+  const d=SCULPT_DESIGNS[kind==='leader'?'soldier':kind](v,kind==='leader');
+  const body=scMerge(scMesh(d.body,0.023),scMesh(d.head,0.0115,{aoK:5}));
+  const gear=d.gear&&d.gear.length?scMesh(d.gear,0.015,{skinSoft:0.004,aoK:4}):null;
+  const glow=d.glow&&d.glow.length?scMesh(d.glow,0.009,{skinSoft:0.004,aoK:0}):null;
+  const J={}; for(const k in d.J){ if(k!=='o') J[k]=d.J[k]; } J.o=d.J.o;
+  return {J,body,gear,glow};
+}
+
+</script>
 
 <script>
 (function main(){
@@ -514,6 +1016,8 @@ function buildResources(){
     R.toonMat=new THREE.MeshToonMaterial({vertexColors:true,gradientMap:gt,skinning:true});
     R.glowMat=new THREE.MeshBasicMaterial({vertexColors:true,skinning:true});
     R.outlineMat=new THREE.MeshBasicMaterial({color:0x0a0a12,side:THREE.BackSide,skinning:true}); }
+  R.sculptMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.78,metalness:0.0,skinning:true});
+  R.sculptGearMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.5,metalness:0.3,skinning:true});
   R.gunVC=new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.45,metalness:0.45});
   R.beamGeo=new THREE.CylinderGeometry(0.75,0.75,3.2,20,1,true);
   R.droneMat=new THREE.MeshStandardMaterial({color:0x2b3036,roughness:0.5,metalness:0.5});
@@ -1126,14 +1630,7 @@ function buildToonChar(kind){
 }
 // ================= 3Dモデル（Quaternius製・poly.pizza配布）読み込み =================
 // models/ フォルダに同名ファイルを置けばそちらを優先。無ければ配布元から直接読み込み、失敗時は内蔵トゥーンモデル。
-const MODEL_SRC={
-  soldier:{files:['models/soldier.glb','https://static.poly.pizza/66a55d04-4286-44a3-b289-0d774c27db5b.glb'],h:1.8},
-  zombieA:{files:['models/zombie_a.glb','https://static.poly.pizza/c4002f69-6979-42e8-ad6e-2f4e14fc3a9d.glb'],h:1.85},
-  zombieB:{files:['models/zombie_b.glb','https://static.poly.pizza/cf4368cf-b39e-4c9a-8a83-a9c637740eb8.glb'],h:1.85},
-  zombieC:{files:['models/zombie_c.glb','https://static.poly.pizza/af74108f-e770-4ed0-9d17-83576afece78.glb'],h:1.9},
-  zombieD:{files:['models/zombie_d.glb','https://static.poly.pizza/972d277d-6fc4-46c7-85d1-e4d68cf46548.glb'],h:1.85},
-  rifle:{files:['models/rifle.glb','https://static.poly.pizza/55ae5e9a-5e18-41b7-a352-dbcfc3c60854.glb'],rifle:true}
-};
+const MODEL_SRC={};
 const KIND_MODEL={jugg:['zombieC','zombieA'],queen:['zombieD','zombieA'],leader:['soldier'],soldier:['soldier'],normal:['zombieA','zombieD','zombieB'],runner:['zombieB','zombieA','zombieD'],tank:['zombieC','zombieA'],spitter:['zombieD','zombieA'],boss:['zombieC','zombieA']};
 const KIND_TINT={spitter:0xa6e070,boss:0xa65a55,tank:0xc0b8d0,jugg:0x7d8590,queen:0xc08ae0};
 const GLB={};
@@ -1307,10 +1804,190 @@ function placeRifle(c){
     if(isFinite(_hv.x)){ c.rifle.position.x+=(_hv.x-c.rifle.position.x)*0.5; c.rifle.position.y+=(Math.max(0.9,Math.min(1.6,_hv.y))-c.rifle.position.y)*0.5; c.rifle.position.z+=(_hv.z-0.25-c.rifle.position.z)*0.5; }
   }
 }
+// ================= 造形キャラクターの組み立て（メインスレッド） =================
+const SCULPT={};            // kind -> [{J,geo:{body,gear,glow},ik}]
+let SCULPT_LIB=null;        // フォールバック用（メインスレッドで生成）
+const SB_N=['root','hips','spine','chest','neck','head','clavL','uarmL','farmL','handL','clavR','uarmR','farmR','handR','thighL','shinL','footL','thighR','shinR','footR'];
+const SB_P=[-1,0,1,2,3,4,3,6,7,8,3,10,11,12,1,14,15,1,17,18];
+const SCULPT_JOBS=[['leader',0],['soldier',0],['normal',0],['normal',1],['normal',2],['runner',0],['runner',1],['tank',0],['spitter',0],['boss',0],['jugg',0],['queen',0]];
+function sculptGeo(m){
+  if(!m) return null;
+  const g=new THREE.BufferGeometry(), n=m.pos.length/3;
+  g.setAttribute('position',new THREE.BufferAttribute(m.pos,3));
+  g.setAttribute('normal',new THREE.BufferAttribute(m.nrm,3));
+  g.setAttribute('color',new THREE.BufferAttribute(m.col,3));
+  g.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(m.si,4));
+  g.setAttribute('skinWeight',new THREE.Float32BufferAttribute(m.sw,4));
+  const idx=n<65536?Uint16Array.from(m.idx):(m.idx instanceof Uint32Array?m.idx:Uint32Array.from(m.idx));
+  g.setIndex(new THREE.BufferAttribute(idx,1)); g.computeBoundingSphere(); return g;
+}
+function sculptStore(kind,res){
+  const J=res.J, V3=(a)=>new THREE.Vector3(a[0],a[1],a[2]);
+  const rest={};
+  for(const S of ['L','R']){
+    rest['u'+S]=V3(J['farm'+S]).sub(V3(J['uarm'+S])).normalize();
+    rest['f'+S]=V3(J['hand'+S]).sub(V3(J['farm'+S])).normalize();
+    rest['lu'+S]=V3(J['farm'+S]).distanceTo(V3(J['uarm'+S]));
+    rest['lf'+S]=V3(J['hand'+S]).distanceTo(V3(J['farm'+S]));
+  }
+  const entry={J,rest,geo:{body:sculptGeo(res.body),gear:sculptGeo(res.gear),glow:sculptGeo(res.glow)}};
+  if(kind==='leader'||kind==='soldier') entry.ik=soldierIK(J,rest);
+  (SCULPT[kind]||(SCULPT[kind]=[])).push(entry);
+}
+// 2ボーンIK：銃を両手で構える腕の角度を計算（胸の骨の座標系）
+const GUN_MOUNT=[0.13,0.1,-0.33];
+function solveArm(S,T,L1,L2,pole){
+  const d=T.clone().sub(S), len=Math.min(Math.max(d.length(),Math.abs(L1-L2)+0.01),L1+L2-0.005); d.normalize();
+  const a=(L1*L1-L2*L2+len*len)/(2*len), h=Math.sqrt(Math.max(0,L1*L1-a*a));
+  const up=pole.clone().sub(S); up.addScaledVector(d,-up.dot(d)); if(up.lengthSq()<1e-8) up.set(0,-1,0); up.normalize();
+  return S.clone().addScaledVector(d,a).addScaledVector(up,h);
+}
+function armQuats(restU,restF,S,E,T){
+  const qU=new THREE.Quaternion().setFromUnitVectors(restU,E.clone().sub(S).normalize());
+  const dF=T.clone().sub(E).normalize().applyQuaternion(qU.clone().invert());
+  const qF=new THREE.Quaternion().setFromUnitVectors(restF,dF);
+  return [qU,qF];
+}
+function soldierIK(J,rest){
+  const C=new THREE.Vector3(J.chest[0],J.chest[1],J.chest[2]), M=new THREE.Vector3(GUN_MOUNT[0],GUN_MOUNT[1],GUN_MOUNT[2]);
+  const out={};
+  for(const S of ['L','R']){
+    const sh=new THREE.Vector3(J['uarm'+S][0],J['uarm'+S][1],J['uarm'+S][2]).sub(C);
+    const grip=S==='R'?M.clone().add(new THREE.Vector3(0,-0.07,0.13)):M.clone().add(new THREE.Vector3(0,-0.04,-0.21));
+    const pole=sh.clone().add(S==='R'?new THREE.Vector3(0.2,-0.25,0.12):new THREE.Vector3(-0.22,-0.25,0.02));
+    let T=grip.clone(), E;
+    for(let it=0;it<3;it++){ E=solveArm(sh,T,rest['lu'+S],rest['lf'+S],pole); const dir=grip.clone().sub(E).normalize(); T=grip.clone().addScaledVector(dir,-0.05); }
+    E=solveArm(sh,T,rest['lu'+S],rest['lf'+S],pole);
+    out[S]=armQuats(rest['u'+S],rest['f'+S],sh,E,T);
+  }
+  return out;
+}
+function buildSculptChar(kind){
+  const list=SCULPT[kind], D=list[Math.floor(Math.random()*list.length)], J=D.J;
+  const root=new THREE.Group(), bones=[], B={};
+  for(let i=0;i<SB_N.length;i++){
+    const b=new THREE.Bone(); b.name=SB_N[i]; const p=J[SB_N[i]], pp=SB_P[i]>=0?J[SB_N[SB_P[i]]]:[0,0,0];
+    b.position.set(p[0]-pp[0],p[1]-pp[1],p[2]-pp[2]); if(SB_P[i]>=0) bones[SB_P[i]].add(b); bones.push(b); B[SB_N[i]]=b;
+  }
+  const bodyMat=R.sculptMat.clone();
+  const body=new THREE.SkinnedMesh(D.geo.body,bodyMat);
+  body.add(bones[0]); body.updateMatrixWorld(true);
+  const skel=new THREE.Skeleton(bones); body.bind(skel);
+  body.castShadow=true; body.receiveShadow=true; body.frustumCulled=false; root.add(body);
+  for(const [g,mat,sh] of [[D.geo.gear,R.sculptGearMat,true],[D.geo.glow,R.glowMat,false]]){
+    if(!g) continue; const m=new THREE.SkinnedMesh(g,mat); m.bind(skel,body.bindMatrix); m.castShadow=sh; m.frustumCulled=false; root.add(m);
+  }
+  const isSoldier=(kind==='leader'||kind==='soldier');
+  let rifle=null, gunModel=null, muzzle=null, core=null, aura=null;
+  if(isSoldier){
+    rifle=new THREE.Group(); rifle.position.set(GUN_MOUNT[0],GUN_MOUNT[1],GUN_MOUNT[2]); B.chest.add(rifle);
+    gunModel=makeGunModel(curWeapon,wLv(curWeapon)>=3); rifle.add(gunModel); muzzle=gunModel.getObjectByName('muzzle');
+  }
+  if(kind==='boss'||kind==='queen'){
+    const col=kind==='queen'?0xf0abfc:0xff2a2a;
+    core=new THREE.Mesh(R.sphere,new THREE.MeshBasicMaterial({color:col})); core.scale.setScalar(0.05); core.position.set(0,-0.01,-0.2); B.chest.add(core);
+    aura=new THREE.Sprite(new THREE.SpriteMaterial({map:R.softTex,color:kind==='queen'?0xd946ef:0xff2a2a,transparent:true,opacity:0.3,depthWrite:false,blending:THREE.AdditiveBlending}));
+    aura.scale.set(1.3,1.3,1); aura.position.set(0,J.chest[1],0); root.add(aura);
+    bodyMat.userData.baseE=new THREE.Color(kind==='queen'?0x14051a:0x1e0303); bodyMat.emissive.copy(bodyMat.userData.baseE);
+  }
+  root.scale.setScalar(CHAR_DEF[kind].scale); scene.add(root);
+  return {kind,root,B,J,rest:D.rest,ik:D.ik,mats:[bodyMat],rifle,gunModel,muzzle,wpn:wKey(),core,coreBase:core?0.05:0,aura,phase:Math.random()*6.28,seed:Math.random(),hit:0,t:0,sculpt:true};
+}
+// ---- 手続きアニメーション ----
+const _v1=new THREE.Vector3(), _v2=new THREE.Vector3(), _q1=new THREE.Quaternion();
+function poseArm(c,S,du,df){
+  const B=c.B, r=c.rest;
+  B['uarm'+S].quaternion.setFromUnitVectors(r['u'+S],du);
+  _q1.copy(B['uarm'+S].quaternion).invert();
+  _v2.copy(df).applyQuaternion(_q1);
+  B['farm'+S].quaternion.setFromUnitVectors(r['f'+S],_v2);
+}
+function legs(c,ph,amp,knee,limp,wide){
+  const B=c.B;
+  for(const [S,off,a] of [['L',0,1],['R',Math.PI,limp||1]]){
+    const s=Math.sin(ph+off);
+    B['thigh'+S].rotation.set(s*amp*a+0.05,0,(S==='L'?-1:1)*(wide||0.04));
+    B['shin'+S].rotation.set(-Math.max(0,Math.sin(ph+off+1.25))*knee*a-0.08,0,0);
+    B['foot'+S].rotation.set(-(B['thigh'+S].rotation.x+B['shin'+S].rotation.x)*0.6,0,0);
+  }
+}
+function animSoldier(c,dt,recoil,vx){
+  if(!c.sculpt) return animSoldierToon(c,dt,recoil);
+  const B=c.B, sp=c.J.o; c.t+=dt;
+  const mv=Math.min(1,Math.abs(vx||0)/3.5);
+  if(mv>0.05) c.phase+=dt*(6+mv*5);
+  const ph=c.phase, br=Math.sin(c.t*1.9);
+  B.hips.position.y=sp.hipY-0.025+(mv>0.05?Math.abs(Math.cos(ph))*0.03*mv:br*0.004);
+  B.hips.rotation.set(0,0.12,0); B.spine.rotation.set(0.02,-0.08,0);
+  B.chest.rotation.set(-0.03+br*0.01+recoil*0.07,-0.04,0); B.neck.rotation.set(0.04,-0.02,0); B.head.rotation.set(0.05,0,0);
+  for(const [S,off] of [['L',0],['R',Math.PI]]){
+    const s=Math.sin(ph+off)*mv;
+    B['thigh'+S].rotation.set(0.14+s*0.45,0,(S==='L'?-1:1)*(0.1+Math.max(0,s)*0.1));
+    B['shin'+S].rotation.set(-0.28-Math.max(0,Math.sin(ph+off+1.2))*0.7*mv,0,0);
+    B['foot'+S].rotation.set(-(B['thigh'+S].rotation.x+B['shin'+S].rotation.x)*0.8,0,0);
+  }
+  if(c.ik){ for(const S of ['L','R']){ B['uarm'+S].quaternion.copy(c.ik[S][0]); B['farm'+S].quaternion.copy(c.ik[S][1]); B['hand'+S].rotation.set(0,0,0); } }
+}
+function animZombie(c,dt,type){
+  if(!c.sculpt) return animZombieToon(c,dt,type);
+  const B=c.B, sp=c.J.o, hit=c.hit||0; c.t+=dt;
+  if(c.hit>0) c.hit=Math.max(0,c.hit-dt*5);
+  const rate=type==='runner'?15:(type==='tank'||type==='jugg'?5:(type==='boss'?3.6:(type==='queen'?3.2:(type==='spitter'?5.5:6.5))));
+  c.phase+=dt*rate; const ph=c.phase, s=Math.sin(ph), cp=Math.cos(ph), sd=c.seed;
+  if(type==='runner'){
+    B.hips.position.y=sp.hipY-0.04+Math.abs(cp)*0.08; B.hips.rotation.set(0,s*0.12,0);
+    B.spine.rotation.set(-0.45+hit*0.6,-s*0.15,0); B.chest.rotation.set(-0.15,-s*0.1,0); B.neck.rotation.set(0.3,0,0); B.head.rotation.set(0.25,0,0);
+    legs(c,ph,1.0,1.5,1,0.03);
+    for(const [S,x,o] of [['L',-1,1],['R',1,-1]]){ _v1.set(x*0.25,-0.8,o*s*0.75).normalize(); _v2.set(x*0.05,0.35,-1).normalize(); poseArm(c,S,_v1,_v2); }
+    return;
+  }
+  const heavy=(type==='tank'||type==='boss'||type==='jugg');
+  B.hips.position.y=sp.hipY-0.03+Math.abs(cp)*(heavy?0.03:0.04);
+  B.hips.rotation.set(0,s*0.08,s*(heavy?0.06:(type==='spitter'?0.14:0.09)));
+  const lean=type==='spitter'?-0.3:(heavy?-0.18:(type==='queen'?-0.1:-0.28));
+  B.spine.rotation.set(lean+hit*0.6,-s*0.08,-s*0.05); B.chest.rotation.set(heavy?-0.05:-0.12,0,0);
+  B.neck.rotation.set(heavy?0.15:0.18,Math.sin(c.t*0.7+sd*6)*0.25,0); B.head.rotation.set(0.12,0,0.18*Math.sin(c.t*0.9+sd*4));
+  legs(c,ph,heavy?0.42:0.48,heavy?0.6:0.75,type==='normal'?(sd<0.5?0.6:1):1,heavy?0.1:0.05);
+  for(const [S,x] of [['L',-1],['R',1]]){
+    if(heavy){ _v1.set(x*0.38,-1,(x<0?s:-s)*0.3).normalize(); _v2.set(x*0.2,-0.8,-0.5).normalize(); }
+    else if(type==='spitter'){ _v1.set(x*0.55,-1,0.1+(x<0?s:-s)*0.1).normalize(); _v2.set(x*0.3,-1,-0.2).normalize(); }
+    else if(type==='queen'){ _v1.set(x*0.35,-0.3+Math.sin(c.t*1.3+x)*0.15,-1).normalize(); _v2.set(x*0.1,0.1,-1).normalize(); }
+    else{ const hang=(sd>0.8&&x>0); if(hang){ _v1.set(x*0.2,-1,0.1*s).normalize(); _v2.set(0,-1,-0.1).normalize(); } else { _v1.set(x*0.18,-0.2+Math.sin(c.t*1.4+x*2)*0.08,-1).normalize(); _v2.set(x*0.04,-0.05,-1).normalize(); } }
+    poseArm(c,S,_v1,_v2);
+  }
+}
+// ---- 生成（Web Worker で並列化） ----
+function runSculpt(onProgress,onDone){
+  const src=(document.getElementById('sculpt-src')||{}).textContent||'';
+  let done=0, finished=false;
+  const total=SCULPT_JOBS.length;
+  const finish=()=>{ if(finished) return; finished=true; onDone(); };
+  const store=(kind,res)=>{ try{ sculptStore(kind,res); }catch(e){} done++; onProgress(done,total); if(done>=total) finish(); };
+  const fallback=(jobs)=>{
+    try{ if(!SCULPT_LIB) SCULPT_LIB=new Function(src+'\nreturn scBuildDesign;')(); }catch(e){ finish(); return; }
+    let i=0; const step=()=>{ if(finished) return; if(i>=jobs.length) return; const j=jobs[i++]; try{ store(j[0],SCULPT_LIB(j[0],j[1])); }catch(e){ done++; } setTimeout(step,0); }; step();
+  };
+  if(!src){ finish(); return; }
+  let workers=[];
+  try{
+    const code=src+'\nonmessage=function(e){ var d=e.data; try{ var r=scBuildDesign(d.kind,d.v); var out={id:d.id,kind:d.kind,J:r.J}, tr=[]; ["body","gear","glow"].forEach(function(k){ var m=r[k]; if(!m){ out[k]=null; return; } var idx=new Uint32Array(m.idx); out[k]={pos:m.pos,nrm:m.nrm,col:m.col,si:m.si,sw:m.sw,idx:idx}; tr.push(m.pos.buffer,m.nrm.buffer,m.col.buffer,m.si.buffer,m.sw.buffer,idx.buffer); }); postMessage(out,tr); }catch(err){ postMessage({id:d.id,kind:d.kind,error:String(err)}); } };';
+    const url=URL.createObjectURL(new Blob([code],{type:'text/javascript'}));
+    const nW=Math.max(1,Math.min(4,(navigator.hardwareConcurrency||4)-1));
+    const queue=SCULPT_JOBS.slice(); const pending=new Set();
+    for(let w=0;w<nW;w++){
+      const wk=new Worker(url); workers.push(wk);
+      const next=()=>{ const j=queue.shift(); if(!j){ wk.terminate(); return; } pending.add(j); wk.postMessage({id:j[0]+j[1],kind:j[0],v:j[1]}); wk._job=j; };
+      wk.onmessage=(e)=>{ const d=e.data; pending.delete(wk._job); if(!d.error) store(d.kind,d); else { done++; onProgress(done,total); if(done>=total) finish(); } next(); };
+      wk.onerror=()=>{ const j=wk._job; wk.terminate(); if(j&&pending.has(j)){ pending.delete(j); fallback([j]); } const rest=queue.splice(0); if(rest.length) fallback(rest); };
+      next();
+    }
+  }catch(e){ workers.forEach(w=>w.terminate()); fallback(SCULPT_JOBS.slice()); }
+}
+
 function buildCharacter(kind){
   if(kind==='crawler') return buildCrawler();
   const key=modelKeyFor(kind);
-  const c=key?buildGLBChar(kind,key):buildToonChar(kind);
+  const c=SCULPT[kind]&&SCULPT[kind].length?buildSculptChar(kind):(key?buildGLBChar(kind,key):buildToonChar(kind));
   if(kind==='leader'){ const ring=new THREE.Mesh(R.ringFx,new THREE.MeshBasicMaterial({color:0x38bdf8,transparent:true,opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide})); ring.scale.set(0.7,1,0.7); ring.position.y=0.05; c.root.add(ring); }
   return c;
 }
@@ -1325,7 +2002,7 @@ function getChar(kind){
 function releaseChar(c){ c.root.visible=false; (charPool[c.kind]||(charPool[c.kind]=[])).push(c); }
 function setCharFlash(c,v){ for(const m of c.mats){ if(!m.emissive) continue; const b=m.userData.baseE; const r=v*0.32, g=v*0.08, bl=v*0.05; if(b) m.emissive.setRGB(b.r+r,b.g+g,b.b+bl); else m.emissive.setRGB(r,g,bl); } }
 const kneeBend=(ph,amt)=>-Math.max(0,Math.sin(ph))*amt;
-function animSoldier(c,dt,recoil){
+function animSoldierToon(c,dt,recoil){
   const B=c.B, sp=c.sp; c.phase+=dt*10.5; const ph=c.phase, s=Math.sin(ph);
   B[1].position.y=sp.hipY+Math.abs(Math.cos(ph))*0.045; B[1].rotation.set(0,s*0.08,0);
   B[2].rotation.set(-0.05+recoil*0.1,-s*0.07,0); B[3].rotation.set(0.04,s*0.04,0);
@@ -1334,7 +2011,7 @@ function animSoldier(c,dt,recoil){
   B[6].rotation.set(0.75,0,-0.12); B[7].rotation.set(0.9,0,0);
   B[4].rotation.set(1.35,0,0.5); B[5].rotation.set(0.25,0,0.3);
 }
-function animZombie(c,dt,type){
+function animZombieToon(c,dt,type){
   const B=c.B, sp=c.sp, hit=c.hit;
   if(c.hit>0) c.hit=Math.max(0,c.hit-dt*5);
   const rate=type==='runner'?15:(type==='tank'?5:(type==='boss'?3.4:(type==='spitter'?5.5:7)));
@@ -1445,9 +2122,9 @@ function updateSquad(dt){
   for(let i=0;i<squad.length;i++){
     const m=squad[i], r=m.c.root, k=Math.min(1,dt*(i===0?18:12));
     const tx=clamp(leaderX+m.ox,-(HALF_W-0.4),HALF_W-0.4), tz=DEFENSE_Z+m.oz+m.recoil*0.12;
-    r.position.x+=(tx-r.position.x)*k; r.position.z+=(tz-r.position.z)*k;
-    r.rotation.x=-m.recoil*0.06; m.recoil=Math.max(0,m.recoil-dt*10);
-    if(m.c.mixer){ m.c.mixer.update(dt); placeRifle(m.c); } else animSoldier(m.c,dt,m.recoil);
+    const px0=r.position.x; r.position.x+=(tx-r.position.x)*k; r.position.z+=(tz-r.position.z)*k; m.vx=dt>0?(r.position.x-px0)/dt:0;
+    r.rotation.x=m.c.sculpt?0:-m.recoil*0.06; m.recoil=Math.max(0,m.recoil-dt*10);
+    if(m.c.mixer){ m.c.mixer.update(dt); placeRifle(m.c); } else animSoldier(m.c,dt,m.recoil,m.vx);
     if(m.flashT>0){ m.flashT-=dt; if(m.flashT<=0) m.flash.visible=false; }
     m.cool-=dt;
     if(m.cool<=0){ m.cool+=cd; if(m.cool<0) m.cool=cd*0.5; fire(m); }
@@ -1812,7 +2489,7 @@ function spawnBoss(){
   bossSpawned=true;
   const type=BOSS_ORDER[(stage-1)%BOSS_ORDER.length], T=BOSS_TYPES[type];
   const c=getChar(T.kind); c.root.position.set(0,0,-58);
-  const hp=Math.round(700*Math.pow(BOSS_GROWTH,stage-1)*T.hpMul);
+  const hp=Math.round(1050*Math.pow(BOSS_GROWTH,stage-1)*T.hpMul);
   boss={type,name:T.name,c,hp,maxHp:hp,kb:0,flash:0,summon:4,enraged:false,dead:false,stompT:0,t:0,stun:0,chargeT:6,tele:0,charging:0,tx:0,retarget:0,phase:'walk',shield:null};
   if(type==='juggernaut'){ const hpS=Math.round(hp*0.3); boss.shield={g:makeShield(),hp:hpS,maxHp:hpS,broken:false}; }
   if(type==='crawler'){ const sd=Math.random()<0.5?-1:1; c.root.position.set(sd*6.8,14,-26); boss.phase='drop'; boss.dropT=0; boss.dropX=sd*6.8; }
@@ -1873,7 +2550,7 @@ function updateBoss(dt){
   p.x+=(targetX-p.x)*Math.min(1,dt*lateral);
   if(b.shield&&!b.shield.broken){ b.shield.g.position.set(p.x,0,p.z+3.0); }
   if(b.flash>0){ b.flash=Math.max(0,b.flash-dt*12); setCharFlash(b.c,b.flash*0.45); }
-  if(b.c.mixer) b.c.mixer.update(dt*(moving?1:0.3)); else if(b.c.custom) animCrawler(b.c,dt,fwd); else animZombie(b.c,dt,'boss');
+  if(b.c.mixer) b.c.mixer.update(dt*(moving?1:0.3)); else if(b.c.custom) animCrawler(b.c,dt,fwd); else animZombie(b.c,dt,b.c.kind);
   if(b.c.core){ b.c.core.scale.setScalar((b.c.coreBase||0.12)*(1+0.3*Math.sin(b.t*(b.enraged?14:6)))); }
   if(b.c.aura){ b.c.aura.material.opacity=(b.enraged?0.5:0.3)+0.1*Math.sin(b.t*5); }
   if(b.type!=='crawler'&&moving){ b.stompT-=dt; if(b.stompT<=0){ b.stompT=b.enraged?0.55:0.8; if(p.z>-30) shake=Math.max(shake,0.2); for(let k=0;k<3;k++){ const d=P.smoke.spawn(p.x+rand(-1.6,1.6),0.3,p.z+rand(-0.8,0.8),rand(-1.5,1.5),rand(0.3,1),rand(-1,1),rand(0.8,1.2),rand(0.5,0.8),0x8a8378,2.5); d.a0=0.45; } } }
@@ -2727,8 +3404,8 @@ function loadAssets(){
   let fired=false;
   const go=()=>{
     if(fired) return; fired=true; assetsFrozen=true;
-    if(!GLB.soldier&&canGLB) setText('loading-text','SIMPLE MODEL MODE');
-    setTimeout(()=>{ prewarm(); setProgress(100); E['loading-box'].classList.add('hidden'); E['start-btn'].classList.remove('hidden'); },30);
+    setText('loading-text','SCULPTING CHARACTERS... 0/'+SCULPT_JOBS.length);
+    runSculpt((n,t)=>{ E['loading-fill'].style.width=Math.floor(n/t*100)+'%'; setText('loading-text','SCULPTING CHARACTERS... '+n+'/'+t); },()=>{ setTimeout(()=>{ prewarm(); setProgress(100); E['loading-box'].classList.add('hidden'); E['start-btn'].classList.remove('hidden'); },30); });
   };
   Promise.all([all,fontP]).then(go);
   setTimeout(go,20000);
